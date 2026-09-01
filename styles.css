@@ -1,0 +1,3270 @@
+.wc-view {
+  --wc-accent: var(--interactive-accent);
+  --wc-rule: var(--background-modifier-border);
+  --wc-soft: var(--background-secondary);
+  --wc-soft-alt: var(--background-secondary-alt);
+  --wc-focus: var(--interactive-accent);
+  --wc-positive: var(--color-green, var(--interactive-accent));
+  --wc-negative: var(--color-red, #c94b55);
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-view button,
+.wc-view select,
+.wc-settings button,
+.wc-project-modal button,
+.wc-project-modal input,
+.wc-project-modal textarea {
+  font: inherit;
+}
+
+.wc-view button:focus-visible,
+.wc-view select:focus-visible,
+.wc-settings button:focus-visible,
+.wc-project-modal button:focus-visible,
+.wc-project-modal input:focus-visible,
+.wc-project-modal textarea:focus-visible {
+  outline: 2px solid var(--wc-focus, var(--interactive-accent));
+  outline-offset: 2px;
+}
+
+.wc-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.wc-sidebar-view {
+  overflow-y: auto;
+}
+
+.wc-month-nav,
+.wc-inline-nav,
+.wc-workbench-controls,
+.wc-panel-heading,
+.wc-modal-actions,
+.wc-data-health,
+.wc-conflict-actions {
+  display: flex;
+  align-items: center;
+}
+
+.wc-select-wrap {
+  min-width: 0;
+}
+
+.wc-select-wrap:not(.is-compact) .wc-select {
+  min-height: 32px;
+}
+
+.wc-select-wrap.is-compact {
+  flex: 1 1 auto;
+}
+
+.wc-select {
+  width: 100%;
+  max-width: 100%;
+  color: var(--text-normal);
+  background-color: var(--background-primary);
+}
+
+.wc-icon-button {
+  flex: 0 0 auto;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: var(--radius-s);
+}
+
+.wc-weekdays,
+.wc-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.wc-weekdays {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+}
+
+.wc-weekdays span {
+  padding: 3px 0;
+}
+
+/* 月历/日历单元格一律不画外边框描边：
+   覆盖 Obsidian 给 button 自带的 input-shadow 描边；
+   hover / 选中用底色淡染表达，选中不用 1px 内环，保持与侧栏日历一致的边框无痕风格。
+   关键属性用高优先级选择器 + !important 固化，防止旧样式缓存或外部样式（主题/其他插件）
+   把格子重新画回描边、灰底或黑色悬停。 */
+.wc-day {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 32px;
+  padding: 3px 2px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+
+  border-radius: 5px;
+  color: var(--text-normal);
+  cursor: pointer;
+  line-height: 1;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+  touch-action: manipulation;
+}
+
+.wc-view .wc-month-grid .wc-day {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+.wc-view .wc-month-grid .wc-day:hover,
+.wc-view .wc-month-grid .wc-day:focus-visible {
+  outline: none !important;
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--wc-accent) 14%, transparent) !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-adjacent-month {
+  color: var(--text-faint) !important;
+  background-color: transparent !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-level-1 {
+  background-color: color-mix(in srgb, var(--wc-accent) 16%, var(--background-primary)) !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-level-2 {
+  background-color: color-mix(in srgb, var(--wc-accent) 27%, var(--background-primary)) !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-level-3 {
+  background-color: color-mix(in srgb, var(--wc-accent) 39%, var(--background-primary)) !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-level-4 {
+  background-color: color-mix(in srgb, var(--wc-accent) 52%, var(--background-primary)) !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-negative {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0,
+    transparent 3px,
+    color-mix(in srgb, var(--text-normal) 22%, transparent) 3px,
+    color-mix(in srgb, var(--text-normal) 22%, transparent) 4px
+  ) !important;
+}
+
+.wc-view .wc-month-grid .wc-day.is-selected {
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--wc-accent) 22%, transparent) !important;
+}
+
+/* 仅活跃点模式（is-dot 容器）：不上色阶底色，活跃日在日期下方点一个 accent 小圆点；
+   「今天」的角标在右下（::after），活跃点居中（::before），两者错开不重叠。 */
+.wc-view .wc-month-grid .wc-day.is-active::before,
+.wc-sidebar-view .wc-sidebar-day.is-active::before {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wc-accent);
+  transform: translateX(-50%);
+}
+
+.wc-view .is-dot .wc-month-grid .wc-day.is-negative {
+  background-image: none !important;
+}
+
+.wc-heat-cell.is-level-1,
+.wc-legend-cell.is-level-1 {
+  background-color: color-mix(in srgb, var(--wc-accent) 16%, var(--background-primary));
+}
+
+.wc-heat-cell.is-level-2,
+.wc-legend-cell.is-level-2 {
+  background-color: color-mix(in srgb, var(--wc-accent) 27%, var(--background-primary));
+}
+
+.wc-heat-cell.is-level-3,
+.wc-legend-cell.is-level-3 {
+  background-color: color-mix(in srgb, var(--wc-accent) 39%, var(--background-primary));
+}
+
+.wc-heat-cell.is-level-4,
+.wc-legend-cell.is-level-4 {
+  background-color: color-mix(in srgb, var(--wc-accent) 52%, var(--background-primary));
+}
+
+.wc-heat-cell.is-negative {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0,
+    transparent 3px,
+    color-mix(in srgb, var(--text-normal) 22%, transparent) 3px,
+    color-mix(in srgb, var(--text-normal) 22%, transparent) 4px
+  );
+}
+
+.wc-day.is-today::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wc-accent);
+}
+
+.wc-day-number {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.wc-day-value {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-inline-status {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--text-warning);
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.45;
+}
+
+.wc-inline-icon {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+}
+
+.wc-workbench-view {
+  --wc-page-gutter: clamp(16px, 2.2vw, 32px);
+  padding: 0 var(--wc-page-gutter) 40px;
+  overflow: auto;
+}
+
+.wc-workbench-view > * {
+  width: min(100%, 1420px);
+  margin-inline: auto;
+}
+
+.wc-workbench-header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  padding: 20px 0 14px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--wc-rule);
+  background: color-mix(in srgb, var(--background-primary) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.wc-title-group h1 {
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 680;
+  letter-spacing: -0.025em;
+}
+
+.wc-title-group > span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.wc-workbench-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.wc-summary-strip {
+  display: grid;
+  grid-template-columns: 1.2fr repeat(4, 1fr);
+  margin: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--wc-rule);
+}
+
+.wc-summary-item {
+  min-width: 0;
+  padding: 0 16px;
+  border-left: 1px solid var(--wc-rule);
+}
+
+.wc-summary-item:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.wc-summary-item dt {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-summary-item dd {
+  margin: 5px 0 0;
+  font-family: var(--font-monospace);
+  font-size: clamp(19px, 2.3vw, 28px);
+  font-weight: 590;
+  letter-spacing: -0.035em;
+}
+
+.wc-summary-item dd.is-positive,
+.wc-data-table .is-positive {
+  color: var(--wc-positive);
+}
+
+.wc-summary-item dd.is-negative,
+.wc-data-table .is-negative {
+  color: var(--wc-negative);
+}
+
+.wc-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.78fr) minmax(480px, 1.65fr);
+  gap: 12px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+
+.wc-timeline-stack {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+}
+
+.wc-panel {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--wc-rule);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+}
+
+.wc-panel h2,
+.wc-panel h3,
+.wc-panel h4 {
+  margin: 0;
+}
+
+.wc-panel h2 {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.wc-panel-heading {
+  min-height: 32px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wc-panel-kicker {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-inline-nav {
+  gap: 4px;
+}
+
+.wc-month-label {
+  min-width: 104px;
+  text-align: center;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.wc-calendar.is-workbench {
+  margin-top: 18px;
+}
+
+.wc-calendar.is-workbench .wc-day {
+  min-height: 52px;
+  justify-content: flex-start;
+  padding: 7px 4px 4px;
+}
+
+.wc-calendar.is-workbench .wc-day-number {
+  font-size: var(--font-ui-medium);
+}
+
+.wc-calendar.is-workbench .wc-day-value {
+  margin-top: auto;
+  padding-bottom: 3px;
+  font-size: 10px;
+}
+
+.wc-streak-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: right;
+}
+
+.wc-heatmap-scroll,
+.wc-bar-scroll,
+.wc-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+/* 热力图格子尺寸统一走 --wc-heat-size：月份轨道、星期列与网格共用，
+   窄屏 media query 只改这一个变量，避免轨道与网格因尺寸不同而累计错位。 */
+.wc-heatmap-scroll {
+  --wc-heat-size: 10px;
+  padding: 12px 2px 4px;
+}
+
+.wc-heatmap-months {
+  display: grid;
+  width: max-content;
+  min-width: 100%;
+  padding-left: 27px;
+  grid-template-columns: repeat(53, var(--wc-heat-size));
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.wc-heatmap-months span {
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.wc-heatmap-body {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.wc-heatmap-weekdays {
+  display: grid;
+  width: 22px;
+  flex: 0 0 22px;
+  grid-template-rows: repeat(7, var(--wc-heat-size));
+  gap: 3px;
+  color: var(--text-faint);
+  font-size: 8px;
+  line-height: var(--wc-heat-size);
+}
+
+.wc-heatmap-grid {
+  display: grid;
+  grid-template-rows: repeat(7, var(--wc-heat-size));
+  grid-auto-columns: var(--wc-heat-size);
+  grid-auto-flow: column;
+  gap: 3px;
+}
+
+.wc-heat-cell,
+.wc-heatmap-spacer,
+.wc-legend-cell {
+  width: var(--wc-heat-size, 10px);
+  height: var(--wc-heat-size, 10px);
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background-color: var(--background-secondary-alt);
+}
+
+.wc-heat-cell {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.wc-heat-cell:focus-visible {
+  outline-width: 2px;
+  outline-offset: 2px;
+}
+
+.wc-heatmap-legend {
+  display: flex;
+  margin-top: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.wc-bar-panel {
+  min-height: 300px;
+}
+
+.wc-bar-scroll {
+  margin-top: 8px;
+  border-bottom: 1px solid var(--wc-rule);
+}
+
+.wc-bar-chart {
+  display: block;
+  height: 228px;
+  min-width: 100%;
+}
+
+.wc-zero-axis {
+  stroke: var(--background-modifier-border-hover);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.wc-bar {
+  fill: var(--wc-accent);
+  cursor: pointer;
+  vector-effect: non-scaling-stroke;
+}
+
+.wc-bar.is-negative {
+  fill: var(--wc-negative);
+}
+
+.wc-bar.is-zero {
+  fill: var(--background-modifier-border-hover);
+}
+
+.wc-bar:hover,
+.wc-bar:focus {
+  stroke: var(--text-normal);
+  stroke-width: 2;
+}
+
+.wc-axis-label {
+  fill: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: 9px;
+}
+
+.wc-details-grid {
+  display: grid;
+  grid-template-columns: minmax(460px, 1.5fr) minmax(260px, 0.8fr) minmax(240px, 0.7fr);
+  gap: 12px;
+  margin-top: 12px;
+  align-items: start;
+}
+
+.wc-data-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: var(--font-ui-small);
+}
+
+.wc-data-table th,
+.wc-data-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--wc-rule);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.wc-data-table th {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+}
+
+.wc-data-table th:first-child,
+.wc-data-table td:first-child,
+.wc-data-table th:last-child,
+.wc-data-table td:last-child {
+  text-align: left;
+}
+
+.wc-data-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--wc-accent) 10%, transparent);
+}
+
+.wc-path-cell {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+}
+
+.wc-link-button {
+  min-height: 24px;
+  padding: 0 2px;
+  border: 0;
+  color: var(--text-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.wc-empty-cell,
+.wc-empty-state,
+.wc-status-empty,
+.wc-scope-copy {
+  padding: 16px 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+.wc-file-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-file-list li + li {
+  margin-top: 10px;
+}
+
+.wc-file-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wc-file-path {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-ui-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-file-value {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-contribution-track {
+  height: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--background-secondary-alt);
+}
+
+.wc-contribution-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wc-accent);
+}
+
+.wc-contribution-fill.is-negative {
+  background: var(--wc-negative);
+}
+
+.wc-small-button {
+  min-height: 28px;
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-scope-list {
+  display: grid;
+  margin: 12px 0 0;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 10px;
+  font-size: var(--font-ui-small);
+}
+
+.wc-scope-list dt {
+  color: var(--text-muted);
+}
+
+.wc-scope-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.wc-status-panel {
+  margin-top: 12px;
+}
+
+.wc-data-health {
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-left: 3px solid var(--wc-positive);
+  background: var(--background-secondary);
+}
+
+.wc-data-health.is-warning {
+  border-left-color: var(--text-warning);
+}
+
+.wc-data-health span {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-diagnostic-list {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-diagnostic-list li + li {
+  margin-top: 5px;
+}
+
+.wc-diagnostic-list .is-error {
+  color: var(--text-error);
+}
+
+.wc-status-bar {
+  cursor: pointer;
+}
+
+/* ---------- 左侧文件列表的字数角标 ---------- */
+
+.nav-file-title > .wc-explorer-count,
+.nav-folder-title > .wc-explorer-count {
+  flex: 0 1 auto;
+  margin-left: auto;
+  padding-left: 8px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wc-settings-intro {
+  max-width: 760px;
+  margin: -4px 0 18px;
+  line-height: 1.55;
+}
+
+.wc-conflict-block {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--text-warning);
+  border-radius: var(--radius-s);
+}
+
+.wc-conflict-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.wc-project-modal .modal-content {
+  width: min(920px, calc(100vw - 48px));
+  max-width: 920px;
+}
+
+.wc-modal-intro {
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.wc-project-modal .setting-item {
+  align-items: flex-start;
+}
+
+.wc-project-modal .setting-item-control,
+.wc-project-modal .setting-item-control input,
+.wc-project-modal .setting-item-control textarea {
+  width: min(100%, 380px);
+}
+
+.wc-project-modal textarea {
+  min-height: 68px;
+  resize: vertical;
+}
+
+.wc-project-modal .wc-json-input {
+  min-height: 112px;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-scope-editor-section {
+  margin-top: 18px;
+}
+
+.wc-scope-editor-section > h3 {
+  margin: 0 0 4px;
+}
+
+.wc-scope-rule-builder {
+  margin-top: 12px;
+}
+
+.wc-scope-rule-list,
+.wc-scope-rule-group-body {
+  display: grid;
+  gap: 10px;
+}
+
+.wc-scope-rule-card {
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+}
+
+.wc-scope-rule-card:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 34%, transparent);
+}
+
+.wc-scope-rule-card-header,
+.wc-scope-rule-card-lead,
+.wc-scope-rule-card-actions,
+.wc-scope-rule-fields,
+.wc-scope-value-fields,
+.wc-scope-rule-add-actions,
+.wc-workbench-filter-footer,
+.wc-workbench-filter-actions {
+  display: flex;
+  align-items: center;
+}
+
+.wc-scope-rule-card-header {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.wc-scope-rule-card-lead {
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wc-scope-rule-card-title {
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+}
+
+.wc-scope-rule-card-actions {
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.wc-scope-icon-button {
+  width: 32px;
+  height: 32px;
+}
+
+.wc-scope-rule-fields,
+.wc-scope-value-fields {
+  align-items: flex-end;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wc-scope-field,
+.wc-scope-connector {
+  display: grid;
+  gap: 5px;
+  min-width: 112px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-scope-field.is-grow {
+  min-width: 180px;
+  flex: 1 1 220px;
+}
+
+.wc-scope-field > input,
+.wc-scope-field > select,
+.wc-scope-connector > select {
+  width: 100%;
+  min-height: 34px;
+  color: var(--text-normal);
+}
+
+.wc-scope-field.is-hidden {
+  display: none;
+}
+
+.wc-scope-connector {
+  grid-template-columns: auto minmax(112px, auto);
+  align-items: center;
+  color: var(--text-faint);
+}
+
+.wc-scope-rule-group {
+  border-left: 3px solid color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+  background: var(--background-secondary-alt);
+}
+
+.wc-scope-rule-group-body {
+  margin: 2px 0 10px 14px;
+}
+
+.wc-scope-rule-group-body .wc-scope-rule-card {
+  background: var(--background-primary);
+}
+
+.wc-scope-rule-empty {
+  padding: 16px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.wc-scope-rule-add-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.wc-scope-group-add {
+  margin-left: 14px;
+}
+
+.wc-scope-advanced {
+  margin-top: 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.wc-scope-advanced > summary {
+  padding: 12px 2px;
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+}
+
+.wc-scope-advanced > summary:focus-visible,
+.wc-workbench-filter > summary:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-s);
+}
+
+.wc-workbench-filter {
+  margin: 2px 0 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  background: var(--background-secondary);
+}
+
+.wc-workbench-filter > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.wc-workbench-filter > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wc-workbench-filter-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-normal);
+  font-weight: var(--font-semibold);
+}
+
+.wc-workbench-filter-summary svg {
+  width: 17px;
+  height: 17px;
+}
+
+.wc-workbench-filter-state {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wc-workbench-filter-state.is-active {
+  color: var(--interactive-accent);
+  font-weight: var(--font-medium);
+}
+
+.wc-workbench-filter-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.wc-workbench-filter .wc-scope-rule-card {
+  background: var(--background-primary);
+}
+
+.wc-workbench-filter-expression textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--font-monospace);
+}
+
+.wc-workbench-filter-footer {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.wc-workbench-filter-preserve {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+}
+
+.wc-workbench-filter-actions {
+  gap: 8px;
+}
+
+.wc-form-errors:not(:empty) {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--text-error);
+  color: var(--text-error);
+  background: var(--background-secondary);
+}
+
+.wc-form-errors ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.wc-modal-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+@media (max-width: 1040px) {
+  .wc-dashboard-grid,
+  .wc-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wc-workbench-header {
+    position: static;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wc-workbench-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .wc-workbench-view {
+    --wc-page-gutter: 10px;
+    padding-bottom: 24px;
+  }
+
+  .wc-title-group > span {
+    display: none;
+  }
+
+  .wc-workbench-controls .wc-select-wrap {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .wc-summary-strip {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 12px;
+  }
+
+  .wc-summary-item,
+  .wc-summary-item:first-child {
+    padding: 0 10px;
+    border-left: 1px solid var(--wc-rule);
+  }
+
+  .wc-summary-item:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .wc-panel {
+    padding: 11px;
+  }
+
+  .wc-panel-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .wc-calendar.is-workbench .wc-day {
+    min-height: 42px;
+  }
+
+  .wc-heatmap-scroll {
+    --wc-heat-size: 13px;
+  }
+
+  .wc-streak-summary {
+    width: 100%;
+    text-align: left;
+  }
+
+  .wc-project-modal .setting-item {
+    display: block;
+  }
+
+  .wc-project-modal .setting-item-control,
+  .wc-project-modal .setting-item-control input,
+  .wc-project-modal .setting-item-control textarea {
+    width: 100%;
+    max-width: none;
+    margin-top: 8px;
+  }
+
+  .wc-project-modal .modal-content {
+    width: calc(100vw - 24px);
+  }
+
+  .wc-scope-rule-card-header,
+  .wc-workbench-filter-footer,
+  .wc-workbench-filter > summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wc-scope-rule-card-actions {
+    align-self: flex-end;
+  }
+
+  .wc-scope-icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .wc-scope-rule-fields,
+  .wc-scope-value-fields,
+  .wc-scope-field,
+  .wc-scope-field.is-grow {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .wc-scope-connector {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .wc-workbench-filter-actions {
+    width: 100%;
+  }
+
+  .wc-workbench-filter-actions > button {
+    flex: 1 1 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wc-view *,
+  .wc-view *::before,
+  .wc-view *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* =========================================================
+   Writing Calendar — compact sidebar heatmap calendar
+   ========================================================= */
+
+.wc-sidebar-view {
+  --wc-heat: var(--wc-accent);
+  /* 重档（4、5 级）用略微去饱和的底色调，避免高纯度刺眼 */
+  --wc-heat-deep: color-mix(in srgb, var(--wc-accent) 90%, #808080);
+  padding: 8px 10px 10px;
+}
+
+/* ---------- Header (month navigation + actions) ---------- */
+
+.wc-sidebar-view .wc-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.wc-sidebar-view .wc-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wc-sidebar-view .wc-sidebar-month-nav {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
+  align-items: center;
+}
+
+.wc-sidebar-view .wc-sidebar-month-nav h3 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.wc-sidebar-view .wc-sidebar-month-nav .wc-icon-button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  justify-self: center;
+}
+
+.wc-sidebar-view .wc-icon-button {
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
+.wc-sidebar-view .wc-icon-button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* 侧栏右上角操作按钮（刷新/详细统计）比月份切换箭头更小一号 */
+.wc-sidebar-view .wc-sidebar-actions .wc-icon-button {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 2px;
+}
+
+.wc-sidebar-view .wc-sidebar-actions .wc-icon-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+
+/* ---------- Calendar heatmap ---------- */
+
+.wc-sidebar-view .wc-sidebar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(20px, 1fr));
+  gap: 1px;
+  margin-bottom: 1px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: var(--font-medium);
+  line-height: 1;
+  text-align: center;
+}
+
+.wc-sidebar-view .wc-sidebar-weekdays span {
+  padding: 1px 0 2px;
+}
+
+/* 列宽随侧栏伸缩；最小 20px 保证窄侧栏下数字不重叠 */
+.wc-sidebar-view .wc-sidebar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(20px, 1fr));
+  gap: 1px;
+}
+
+/* 显示小数字时格子略宽，保证两行文字不重叠 */
+.wc-sidebar-view .wc-sidebar-calendar.is-showing-values .wc-sidebar-weekdays,
+.wc-sidebar-view .wc-sidebar-calendar.is-showing-values .wc-sidebar-grid {
+  grid-template-columns: repeat(7, minmax(24px, 1fr));
+}
+
+/* 更扁、更柔和：色块微圆角近无缝；0 字日期透明，不显格子边框 */
+.wc-sidebar-view .wc-sidebar-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  aspect-ratio: 5 / 4;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  outline: 0;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  cursor: pointer;
+  line-height: 1;
+  touch-action: manipulation;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* 六档色阶：0 / 1-500 / 501-1000 / 1001-2000 / 2001-3000 / 3000+ */
+.wc-sidebar-view .wc-sidebar-day.is-level-0 {
+  background-color: transparent;
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-level-1 {
+  background-color: color-mix(in srgb, var(--wc-heat) 14%, var(--background-primary));
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-level-2 {
+  background-color: color-mix(in srgb, var(--wc-heat) 25%, var(--background-primary));
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-level-3 {
+  background-color: color-mix(in srgb, var(--wc-heat) 39%, var(--background-primary));
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-level-4 {
+  background-color: color-mix(in srgb, var(--wc-heat-deep) 52%, var(--background-primary));
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-level-5 {
+  background-color: color-mix(in srgb, var(--wc-heat-deep) 70%, var(--background-primary));
+}
+
+.wc-sidebar-view .wc-sidebar-day-number {
+  color: inherit;
+  font-size: 10px;
+  font-weight: var(--font-normal);
+  line-height: 1;
+}
+
+/* 日期下方的当日字数（更小字号，仅"显示小数字"模式） */
+.wc-sidebar-view .wc-sidebar-day-value {
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: 7px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 相邻月：浅灰弱化 */
+.wc-sidebar-view .wc-sidebar-day.is-adjacent-month {
+  color: var(--text-faint);
+  opacity: 0.45;
+}
+
+/* 今天：accent 加粗数字 */
+.wc-sidebar-view .wc-sidebar-day.is-today .wc-sidebar-day-number {
+  color: var(--wc-accent);
+  font-weight: var(--font-semibold);
+}
+
+/* 选中：数字后淡紫圆底，无描边 */
+.wc-sidebar-view .wc-sidebar-day.is-selected {
+  box-shadow: none;
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-selected .wc-sidebar-day-number {
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--wc-heat) 30%, var(--background-primary));
+  font-weight: var(--font-semibold);
+}
+
+.wc-sidebar-view .wc-sidebar-day.is-negative .wc-sidebar-day-number,
+.wc-sidebar-view .wc-sidebar-day.is-negative .wc-sidebar-day-value {
+  color: var(--wc-negative);
+}
+
+/* 无描边悬停/聚焦：只做轻微底色提示 */
+.wc-sidebar-view .wc-sidebar-day:hover,
+.wc-sidebar-view .wc-sidebar-day:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background-color: color-mix(in srgb, var(--wc-accent) 12%, var(--background-primary));
+}
+
+
+/* ---------- One-line summary ---------- */
+
+.wc-sidebar-summary-line {
+  margin-top: 8px;
+  padding-top: 7px;
+
+  border-top: 1px solid var(--background-modifier-border);
+
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+
+  white-space: normal;
+}
+
+/* 写作目标行：与摘要行同排版，但不加分隔线 */
+.wc-sidebar-goal-line,
+.wc-sidebar-time-line {
+  margin-top: 6px;
+
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+
+  white-space: normal;
+}
+
+
+/* ---------- Actions (in header) ---------- */
+
+.wc-sidebar-view .wc-open-workbench {
+  display: inline-flex;
+  width: auto;
+  min-height: 20px;
+  padding: 0;
+
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+
+  color: var(--text-accent);
+  font-size: 11px;
+  font-weight: var(--font-normal);
+}
+
+.wc-sidebar-view .wc-open-workbench:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-decoration: underline;
+}
+
+
+/* ---------- Narrow window ---------- */
+
+@media (max-width: 620px) {
+  .wc-sidebar-view {
+    padding-inline: 8px;
+  }
+
+  .wc-sidebar-view .wc-sidebar-day-number {
+    font-size: 9px;
+  }
+
+  .wc-sidebar-view .wc-sidebar-day-value {
+    font-size: 6px;
+  }
+}
+
+
+/* =========================================================
+   Writing Calendar — 悬停日期的多行提示
+   挂在 body 上，浅色跟随主题底色 + 强调色淡染
+   ========================================================= */
+
+.wc-tooltip {
+  --wc-tooltip-fill: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--background-primary) 88%, var(--wc-accent, var(--interactive-accent))) 80%,
+    transparent
+  );
+  position: fixed;
+  z-index: var(--layer-popover);
+  display: none;
+  max-width: 320px;
+  padding: 6px 9px;
+  /* 玻璃描边：透明边框 + 双背景层，外圈 1px 上亮下染强调色的渐变描边 */
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--wc-tooltip-fill), var(--wc-tooltip-fill)) padding-box,
+    linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--background-primary) 65%, transparent),
+        color-mix(in srgb, var(--wc-accent, var(--interactive-accent)) 30%, transparent)
+      )
+      border-box;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--background-primary) 50%, transparent),
+    var(--shadow-s);
+  color: var(--text-normal);
+  font-size: 10px;
+  line-height: 1.55;
+  text-align: center;
+  pointer-events: none;
+}
+
+.wc-tooltip-line {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.wc-tooltip-line + .wc-tooltip-line {
+  margin-top: 2px;
+}
+
+
+/* =========================================================
+   Writing Calendar — 新版统计工作台 Demo（独立视图）
+   容器查询：按工作台 View 实际宽度响应（窄 / 标准 / 宽）
+   ========================================================= */
+
+.wc-demo-view {
+  container-type: inline-size;
+  overflow-y: auto;
+}
+
+.wc-demo-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: 16px 20px 48px;
+}
+
+/* ---------- 页头 ---------- */
+
+.wc-demo-header {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 2px 14px;
+  border-bottom: 1px solid var(--wc-rule);
+}
+
+.wc-demo-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wc-demo-title-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.wc-demo-title-row h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.wc-demo-badge {
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--wc-accent) 35%, transparent);
+  border-radius: 999px;
+  color: var(--wc-accent);
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.02em;
+}
+
+/* 页头右侧的统计指标切换器：固定宽度，不随标题行拉伸 */
+.wc-demo-header-actions {
+  display: flex;
+  min-width: 0;
+  margin-left: auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wc-demo-header-controls {
+  margin-left: auto;
+}
+
+.wc-demo-header-actions .wc-demo-header-controls {
+  margin-left: 0;
+}
+
+.wc-demo-header-controls .wc-select-wrap.is-compact {
+  flex: 0 0 auto;
+  width: 132px;
+}
+
+.wc-demo-diagnostics-action {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--wc-rule);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.wc-demo-diagnostics-action:hover {
+  border-color: color-mix(in srgb, var(--wc-accent) 38%, var(--wc-rule));
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--wc-accent) 8%, transparent);
+}
+
+.wc-demo-diagnostics-icon {
+  display: inline-flex;
+}
+
+.wc-demo-diagnostics-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wc-demo-subtitle {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* ---------- 今日概览（扁平单行：大数字在左，指标一排在右） ---------- */
+
+.wc-demo-today {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px 9px;
+  border: 1px solid var(--wc-rule);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--background-primary) 72%, var(--background-secondary));
+}
+
+.wc-demo-today-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wc-demo-kicker {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  letter-spacing: 0.04em;
+}
+
+.wc-demo-today-date {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.wc-demo-today-main {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.wc-demo-today-hero {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.wc-demo-hero-value {
+  color: var(--wc-accent);
+  font-family: var(--font-monospace);
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 680;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.wc-demo-hero-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.wc-demo-today-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 4px 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wc-demo-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--wc-accent) 22%, transparent);
+}
+
+.wc-demo-metric-value {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wc-demo-metric-value.is-muted {
+  color: var(--text-faint);
+}
+
+.wc-demo-metric.is-positive {
+  border-left-color: color-mix(in srgb, var(--wc-positive) 45%, transparent);
+}
+
+.wc-demo-metric.is-negative {
+  border-left-color: color-mix(in srgb, var(--wc-negative) 45%, transparent);
+}
+
+.wc-demo-metric.is-positive .wc-demo-metric-value {
+  color: var(--wc-positive);
+}
+
+.wc-demo-metric.is-negative .wc-demo-metric-value {
+  color: var(--wc-negative);
+}
+
+.wc-demo-metric-label {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.wc-demo-metric-caption {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.wc-demo-today-line {
+  margin-top: 1px;
+  padding-top: 7px;
+  border-top: 1px solid var(--wc-rule);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ---------- 模块网格 ---------- */
+
+.wc-demo-modules {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.wc-demo-module {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--wc-rule);
+  border-radius: 12px;
+  background: var(--background-primary);
+}
+
+.wc-demo-module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.wc-demo-module-head h2 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.wc-demo-module-kicker {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.wc-demo-inline-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wc-demo-month-label {
+  min-width: 88px;
+  text-align: center;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.wc-demo-empty,
+.wc-demo-placeholder {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+/* 标准 / 宽视图：月历 2/3 + 当天详情 1/3，趋势 2/3 + 最近文档 1/3，热力图整行，写作目标整行 */
+@container (min-width: 760px) {
+  .wc-demo-modules {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-areas:
+      "calendar calendar calendar calendar day-detail day-detail"
+      "trend trend trend trend recent-documents recent-documents"
+      "heatmap heatmap heatmap heatmap heatmap heatmap"
+      "goal goal goal goal goal goal";
+  }
+
+  .wc-demo-module[data-module-id="calendar"] {
+    grid-area: calendar;
+  }
+
+  .wc-demo-module[data-module-id="day-detail"] {
+    grid-area: day-detail;
+  }
+
+  .wc-demo-module[data-module-id="trend"] {
+    grid-area: trend;
+  }
+
+  .wc-demo-module[data-module-id="heatmap"] {
+    grid-area: heatmap;
+  }
+
+  .wc-demo-module[data-module-id="recent-documents"] {
+    grid-area: recent-documents;
+  }
+
+  .wc-demo-module[data-module-id="goal"] {
+    grid-area: goal;
+  }
+}
+
+/* ---------- 月历（大型） ---------- */
+
+.wc-demo-calendar .wc-day {
+  min-height: 40px;
+}
+
+.wc-demo-calendar .wc-day-number {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.wc-demo-calendar .wc-day-value {
+  font-size: 10px;
+}
+
+@container (min-width: 760px) {
+  .wc-demo-calendar .wc-day {
+    min-height: 50px;
+  }
+}
+
+/* ---------- 当天详情 ---------- */
+
+.wc-demo-detail-date {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.wc-demo-detail-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.wc-demo-detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-detail-name {
+  color: var(--text-muted);
+}
+
+.wc-demo-detail-value {
+  font-family: var(--font-monospace);
+}
+
+.wc-demo-detail-value.is-positive {
+  color: var(--wc-positive);
+}
+
+.wc-demo-detail-value.is-negative {
+  color: var(--wc-negative);
+}
+
+.wc-demo-detail-subhead {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+}
+
+.wc-demo-detail-files {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-demo-detail-files li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-file-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-demo-file-value {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-demo-more {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+/* ---------- Session 概览（时长统计推算结果） ---------- */
+
+.wc-demo-session-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.wc-demo-session-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-demo-session-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-session-time {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-demo-session-value {
+  flex: 0 0 auto;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+/* ---------- 写作趋势（柱状图，仿正式工作台，每柱标注具体字数） ---------- */
+
+.wc-demo-trend-scroll {
+  max-width: 100%;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.wc-demo-bar-chart {
+  display: block;
+  height: 212px;
+  min-width: 100%;
+}
+
+.wc-demo-bar-value {
+  fill: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 8px;
+}
+
+.wc-demo-bar-value.is-negative {
+  fill: var(--wc-negative);
+}
+
+/* ---------- 热力图（复用 .wc-heatmap-* 基础网格） ---------- */
+
+.wc-demo-module[data-module-id="heatmap"] .wc-streak-summary {
+  margin: 0 0 2px;
+}
+
+/* ---------- 最近文档 ---------- */
+
+.wc-demo-doc-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-demo-doc-list li {
+  padding: 7px 8px;
+  margin-inline: -8px;
+  border-radius: 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+
+  cursor: pointer;
+}
+
+.wc-demo-doc-list li:last-child {
+  border-bottom: 0;
+}
+
+/* 无描边悬停/聚焦：只做轻微底色提示 */
+.wc-demo-doc-list li:hover,
+.wc-demo-doc-list li:focus-visible {
+  outline: none;
+  box-shadow: none;
+  background-color: color-mix(in srgb, var(--wc-accent) 10%, transparent);
+}
+
+.wc-demo-doc-list li:hover .wc-demo-doc-path {
+  text-decoration: underline;
+}
+
+.wc-demo-doc-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wc-demo-doc-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-doc-value {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-demo-doc-date {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+/* ---------- 写作目标（环形图 + 贡献文档） ---------- */
+
+.wc-demo-goal {
+  /* 小标题占一整行，环与右侧信息在下一行左右排布 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /* 行距 8px；环与右侧「今日 X / 目标 Y + 贡献文档」栏的列距 28px */
+  gap: 8px 28px;
+  margin-top: 8px;
+  /* 贡献分段沿用日历热度底色的 5 档色条（14 / 25 / 39 / 深 52 / 深 70） */
+  --wc-goal-tier-1: color-mix(in srgb, var(--wc-accent) 14%, var(--background-primary));
+  --wc-goal-tier-2: color-mix(in srgb, var(--wc-accent) 25%, var(--background-primary));
+  --wc-goal-tier-3: color-mix(in srgb, var(--wc-accent) 39%, var(--background-primary));
+  --wc-goal-tier-4: color-mix(in srgb, color-mix(in srgb, var(--wc-accent) 90%, #808080) 52%, var(--background-primary));
+  --wc-goal-tier-5: color-mix(in srgb, color-mix(in srgb, var(--wc-accent) 90%, #808080) 70%, var(--background-primary));
+  --wc-goal-other: color-mix(in srgb, var(--text-muted) 30%, var(--background-primary));
+}
+
+.wc-demo-goal-kicker {
+  flex: 0 0 100%;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* 周 / 月目标进度条 */
+.wc-demo-goal-layout,
+.wc-demo-goal-main,
+.wc-demo-goal-aside {
+  min-width: 0;
+}
+
+.wc-demo-goal-section {
+  display: flex;
+  flex-direction: column;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--wc-rule);
+}
+
+.wc-demo-goal-section-title {
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.04em;
+}
+
+.wc-demo-goal-period {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.wc-demo-goal-period-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-goal-period-label {
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+}
+
+.wc-demo-goal-period-value {
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-demo-goal-period-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.wc-demo-goal-period-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--wc-accent);
+  transition: width 200ms ease;
+}
+
+.wc-demo-goal-period.is-achieved .wc-demo-goal-period-fill {
+  background: var(--wc-positive);
+}
+
+/* 近一周每日目标回顾：横向极细条状图，每天一行，今天在最上方 */
+.wc-demo-goal-week {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.wc-demo-goal-hbars {
+  display: grid;
+  gap: 3px;
+}
+
+.wc-demo-goal-hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 16px;
+  cursor: default;
+}
+
+.wc-demo-goal-hbar-day {
+  flex: 0 0 auto;
+  width: 32px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-demo-goal-hbar-track {
+  flex: 1 1 auto;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.wc-demo-goal-hbar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--wc-accent);
+  transition: width 200ms ease;
+}
+
+.wc-demo-goal-hbar-row.is-achieved .wc-demo-goal-hbar-fill {
+  background: var(--wc-positive);
+}
+
+.wc-demo-goal-hbar-value {
+  flex: 0 0 auto;
+  width: 30px;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-demo-goal-hbar-row.is-today .wc-demo-goal-hbar-day,
+.wc-demo-goal-hbar-row.is-today .wc-demo-goal-hbar-value {
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+}
+
+/* 月度打卡：摘要、图例、进度和带日期的方格使用同一层级，避免粗重装饰。 */
+.wc-demo-goal-checkin-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--wc-rule);
+}
+
+.wc-demo-goal-checkin-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wc-demo-goal-checkin-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.wc-demo-goal-checkin-title > span {
+  display: inline-flex;
+  color: var(--wc-accent);
+}
+
+.wc-demo-goal-checkin-title svg {
+  width: 16px;
+  height: 16px;
+}
+
+.wc-demo-goal-week > .wc-demo-goal-kicker,
+.wc-demo-goal-checkin-title h3 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  letter-spacing: normal;
+}
+
+.wc-demo-goal-checkin-summary {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-goal-checkin-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.wc-demo-goal-checkin-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wc-demo-goal-checkin-legend-dot {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  background: var(--background-primary);
+}
+
+.wc-demo-goal-checkin-legend-dot.is-achieved {
+  border-color: transparent;
+  background: var(--wc-positive);
+}
+
+.wc-demo-goal-checkin-legend-dot.is-today {
+  border-color: var(--wc-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wc-accent) 18%, transparent);
+}
+
+.wc-demo-goal-checkin-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-demo-goal-checkin-progress-track {
+  height: 4px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--background-modifier-border);
+}
+
+.wc-demo-goal-checkin-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wc-accent);
+}
+
+.wc-demo-goal-checkin {
+  display: grid;
+  grid-template-columns: repeat(15, minmax(22px, 1fr));
+  gap: 10px 7px;
+}
+
+.wc-demo-goal-checkin-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.wc-demo-goal-checkin-day-number {
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.wc-demo-goal-checkin-day {
+  width: min(100%, 32px);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  cursor: default;
+}
+
+.wc-demo-goal-checkin-day.is-achieved {
+  border-color: transparent;
+  background: var(--wc-positive);
+}
+
+.wc-demo-goal-checkin-day.is-today {
+  outline: 2px solid var(--wc-accent);
+  outline-offset: 2px;
+}
+
+.wc-demo-goal-checkin-day.is-future {
+  opacity: 0.46;
+}
+
+/* 宽工作台：目标摘要在左，本月打卡作为独立侧栏；窄视图自然回落为上下排列。 */
+@container (min-width: 760px) {
+  .wc-demo-goal-layout.has-aside {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(310px, 2fr);
+    align-items: start;
+    gap: 22px;
+  }
+
+  .wc-demo-goal-aside {
+    padding-left: 20px;
+    border-left: 1px solid var(--wc-rule);
+  }
+
+  .wc-demo-goal-aside .wc-demo-goal-checkin-block {
+    margin-top: 18px;
+  }
+
+  .wc-demo-goal-aside .wc-demo-goal-checkin {
+    grid-template-columns: repeat(7, minmax(24px, 1fr));
+  }
+}
+
+.wc-demo-goal-ring-wrap {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  flex: 0 0 auto;
+}
+
+.wc-demo-goal-ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.wc-demo-goal-ring-track {
+  fill: none;
+  stroke: var(--background-modifier-border);
+  stroke-width: 8;
+}
+
+/* 分段圆弧：butt 端帽保证各段首尾相接不重叠 */
+.wc-demo-goal-ring-arc {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: butt;
+}
+
+.wc-demo-goal-ring-arc.is-tier-5 { stroke: var(--wc-goal-tier-5); }
+.wc-demo-goal-ring-arc.is-tier-4 { stroke: var(--wc-goal-tier-4); }
+.wc-demo-goal-ring-arc.is-tier-3 { stroke: var(--wc-goal-tier-3); }
+.wc-demo-goal-ring-arc.is-tier-2 { stroke: var(--wc-goal-tier-2); }
+.wc-demo-goal-ring-arc.is-tier-1 { stroke: var(--wc-goal-tier-1); }
+.wc-demo-goal-ring-arc.is-other { stroke: var(--wc-goal-other); }
+
+.wc-demo-goal-ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: var(--font-medium);
+}
+
+.wc-demo-goal-info {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 4px;
+  text-align: left;
+}
+
+.wc-demo-goal-progress {
+  font-size: var(--font-ui-small);
+}
+
+.wc-demo-goal-docs {
+  display: grid;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.wc-demo-goal-doc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wc-demo-goal-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.wc-demo-goal-swatch.is-tier-5 { background-color: var(--wc-goal-tier-5); }
+.wc-demo-goal-swatch.is-tier-4 { background-color: var(--wc-goal-tier-4); }
+.wc-demo-goal-swatch.is-tier-3 { background-color: var(--wc-goal-tier-3); }
+.wc-demo-goal-swatch.is-tier-2 { background-color: var(--wc-goal-tier-2); }
+.wc-demo-goal-swatch.is-tier-1 { background-color: var(--wc-goal-tier-1); }
+.wc-demo-goal-swatch.is-other { background-color: var(--wc-goal-other); }
+
+.wc-demo-goal-doc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+}
+
+.wc-demo-goal-doc-value {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+/* ---------- 页脚说明 ---------- */
+
+.wc-demo-footer-note {
+  padding-top: 4px;
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ---------- 窄视图微调 ---------- */
+
+@container (max-width: 759px) {
+  .wc-demo-inner {
+    padding-inline: 14px;
+  }
+
+  .wc-demo-today-main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .wc-demo-hero-value {
+    font-size: 26px;
+  }
+}
+
+/* =========================================================
+   Writing Calendar — 专注计时
+   共用日历紧凑模块与独立侧栏；颜色只使用 Obsidian 语义变量，
+   让计时器在不同主题和强调色下保持克制。
+   ========================================================= */
+
+.wc-focus-timer {
+  --wc-focus-surface: color-mix(in srgb, var(--background-secondary) 48%, transparent);
+  --wc-focus-rule: color-mix(in srgb, var(--wc-accent) 20%, var(--background-modifier-border));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--wc-focus-rule);
+  border-radius: 12px;
+  background: var(--wc-focus-surface);
+}
+
+.wc-focus-timer.is-compact {
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.wc-focus-timer.is-compact .wc-focus-header {
+  min-height: 18px;
+}
+
+.wc-focus-timer.is-compact .wc-focus-title {
+  font-size: var(--font-ui-small);
+}
+
+.wc-focus-timer.is-compact .wc-focus-state {
+  font-size: 11px;
+}
+
+.wc-focus-timer.is-full {
+  width: min(100%, 560px);
+  margin: 12px auto 0;
+}
+
+.wc-focus-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wc-focus-title {
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.wc-focus-state {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, var(--wc-accent) 72%, var(--text-muted));
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-focus-countdown {
+  color: color-mix(in srgb, var(--wc-accent) 74%, var(--text-normal));
+  font-family: var(--font-monospace);
+  font-size: clamp(28px, 8vw, 44px);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.025em;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.wc-focus-timer.is-compact .wc-focus-countdown {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.wc-focus-hint,
+.wc-focus-result-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.wc-focus-hint {
+  text-align: center;
+}
+
+.wc-focus-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+/* 每项横向显示“指标名 / 数值”，各项从上到下排列。 */
+.wc-focus-timer.is-compact .wc-focus-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+.wc-focus-timer.is-compact .wc-focus-metric {
+  display: flex;
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 3px 0;
+  border-left: 0;
+  text-align: left;
+}
+
+.wc-focus-timer.is-compact .wc-focus-metric-value {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.wc-focus-timer.is-compact .wc-focus-metric-label {
+  margin-top: 0;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.wc-focus-timer.is-compact .wc-focus-hint {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.wc-focus-timer.is-compact .wc-focus-actions {
+  gap: 6px;
+}
+
+.wc-focus-timer.is-compact .wc-focus-action {
+  min-height: 30px;
+  padding: 3px 10px;
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-focus-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 65%, transparent);
+}
+
+.wc-focus-metric:last-child {
+  border-bottom: 0;
+}
+
+.wc-focus-metric.is-muted {
+  border-left-color: color-mix(in srgb, var(--text-muted) 25%, transparent);
+}
+
+.wc-focus-metric.is-negative {
+  border-left-color: color-mix(in srgb, var(--wc-negative) 48%, transparent);
+}
+
+.wc-focus-metric-value {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-focus-metric.is-negative .wc-focus-metric-value {
+  color: var(--wc-negative);
+}
+
+.wc-focus-metric-label {
+  display: block;
+  margin-top: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
+.wc-focus-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.wc-focus-action {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.wc-focus-action:hover {
+  border-color: color-mix(in srgb, var(--wc-accent) 38%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--wc-accent) 9%, var(--background-primary));
+}
+
+.wc-focus-action.mod-cta {
+  border-color: color-mix(in srgb, var(--wc-accent) 38%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--wc-accent) 16%, var(--background-primary));
+  color: var(--text-normal);
+}
+
+.wc-focus-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wc-focus-result-title {
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+/* ---------- 统计工作台的专注页 ---------- */
+
+/* 写作统计 / 专注统计切换：安静的页签式分段控件。 */
+.wc-workbench-tabs {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 3px;
+  border: 1px solid var(--wc-rule);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+}
+
+.wc-workbench-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+  padding: 4px 13px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.wc-workbench-tabs button:hover {
+  color: var(--text-normal);
+}
+
+.wc-workbench-tabs button.is-active {
+  background: color-mix(in srgb, var(--wc-accent) 11%, var(--background-primary));
+  color: var(--wc-accent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--wc-accent) 78%, transparent);
+}
+
+.wc-workbench-tab-icon {
+  display: inline-flex;
+}
+
+.wc-workbench-tab-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wc-focus-statistics {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.wc-focus-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wc-focus-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--wc-rule);
+  border-radius: 12px;
+  background: var(--background-primary);
+}
+
+.wc-focus-stat-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.wc-focus-stat-value {
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.wc-focus-stat-card > span:not(.wc-focus-stat-label) {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-focus-stat-secondary {
+  color: var(--text-faint) !important;
+}
+
+.wc-focus-recent {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--wc-rule);
+  border-radius: 12px;
+  background: var(--background-primary);
+}
+
+.wc-focus-recent h2 {
+  margin: 0 0 8px;
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.wc-focus-recent ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wc-focus-recent li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.wc-focus-recent li:last-child {
+  border-bottom: 0;
+}
+
+.wc-focus-record-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.wc-focus-record-main span:last-child,
+.wc-focus-record-detail {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.wc-focus-record-main span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-focus-record-detail {
+  margin-top: 3px;
+}
+
+@container (max-width: 620px) {
+  .wc-demo-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wc-demo-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .wc-demo-header-actions .wc-demo-header-controls {
+    flex: 1 1 180px;
+  }
+
+  .wc-demo-header-actions .wc-demo-header-controls,
+  .wc-demo-header-actions .wc-demo-header-controls .wc-select-wrap.is-compact {
+    width: 100%;
+  }
+
+  .wc-demo-diagnostics-action {
+    margin-left: auto;
+  }
+
+  .wc-demo-goal-checkin-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .wc-demo-goal-checkin-legend {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .wc-demo-goal-checkin {
+    grid-template-columns: repeat(10, minmax(22px, 1fr));
+  }
+
+  .wc-focus-stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .wc-demo-goal-checkin {
+    grid-template-columns: repeat(7, minmax(22px, 1fr));
+  }
+
+  .wc-focus-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wc-focus-timer.is-full {
+    padding: 14px 12px;
+  }
+
+  .wc-focus-record-main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+/* =========================================================
+   Writing Calendar — 数据诊断
+   状态优先、文字优先；颜色只辅助表达，不承担唯一语义。
+   ========================================================= */
+
+.wc-diagnostics-view {
+  container-type: inline-size;
+  overflow-y: auto;
+}
+
+.wc-diagnostics-inner {
+  display: flex;
+  max-width: 820px;
+  margin-inline: auto;
+  padding: 22px 24px 48px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wc-diagnostics-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--wc-rule);
+}
+
+.wc-diagnostics-title-group {
+  min-width: 0;
+}
+
+.wc-diagnostics-title-group h1 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 680;
+  letter-spacing: -0.02em;
+}
+
+.wc-diagnostics-subtitle {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+.wc-diagnostics-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wc-diagnostics-refresh {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.wc-diagnostics-refresh-icon,
+.wc-diagnostics-action-icon,
+.wc-diagnostics-status-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.wc-diagnostics-refresh-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wc-diagnostics-refresh:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.wc-diagnostics-secondary-action {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.wc-diagnostics-action-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wc-diagnostics-secondary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.wc-diagnostics-live-status {
+  min-height: 18px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.wc-diagnostics-live-status:not(:empty) {
+  padding: 8px 10px;
+  border-left: 3px solid var(--wc-accent);
+  background: color-mix(in srgb, var(--wc-accent) 8%, var(--background-secondary));
+}
+
+.wc-diagnostics-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 16px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
+.wc-diagnostics-group {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--wc-rule);
+  border-radius: 12px;
+  background: var(--background-primary);
+}
+
+.wc-diagnostics-group h2 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+}
+
+.wc-diagnostics-list {
+  display: flex;
+  margin-top: 8px;
+  flex-direction: column;
+}
+
+.wc-diagnostics-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--wc-rule) 70%, transparent);
+}
+
+.wc-diagnostics-row:first-child {
+  border-top: 0;
+}
+
+.wc-diagnostics-status-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--wc-positive);
+}
+
+.wc-diagnostics-row.is-warning .wc-diagnostics-status-icon {
+  color: var(--text-warning);
+}
+
+.wc-diagnostics-row.is-info .wc-diagnostics-status-icon {
+  color: var(--text-accent);
+}
+
+.wc-diagnostics-row.is-error .wc-diagnostics-status-icon {
+  color: var(--text-error, var(--wc-negative));
+}
+
+.wc-diagnostics-status-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wc-diagnostics-row-body {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.6fr);
+  align-items: baseline;
+  gap: 8px 14px;
+}
+
+.wc-diagnostics-row-label {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.wc-diagnostics-row-value {
+  min-width: 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  overflow-wrap: anywhere;
+}
+
+.wc-diagnostics-row.is-warning .wc-diagnostics-row-value {
+  color: var(--text-warning);
+}
+
+.wc-diagnostics-row.is-error .wc-diagnostics-row-value {
+  color: var(--text-error, var(--wc-negative));
+}
+
+.wc-diagnostics-row-detail {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.wc-diagnostics-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.55;
+}
+
+.wc-diagnostics-change-overflow {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+@container (max-width: 620px) {
+  .wc-diagnostics-inner {
+    padding-inline: 14px;
+  }
+
+  .wc-diagnostics-header {
+    flex-direction: column;
+  }
+
+  .wc-diagnostics-actions,
+  .wc-diagnostics-refresh {
+    width: 100%;
+  }
+
+  .wc-diagnostics-secondary-action {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .wc-diagnostics-refresh {
+    justify-content: center;
+  }
+
+  .wc-diagnostics-row-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .wc-diagnostics-row-detail {
+    margin-top: 3px;
+  }
+}

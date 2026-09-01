@@ -1,0 +1,9 @@
+node_modules/
+main.js
+dist/
+*.map
+data.json
+.writing-calendar-cache/
+coverage/
+.deploy.local.json
+release/
