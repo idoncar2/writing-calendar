@@ -6,7 +6,7 @@ const source = readFileSync(resolve("src/settings/tab.ts"), "utf8");
 
 describe("focus timer settings UI", () => {
   it("shows optional focus controls and removes inferred-time controls", () => {
-    expect(source).toContain('text: "专注计时"');
+    expect(source).toContain('setName("专注计时").setHeading()');
     expect(source).toContain('setName("启用番茄钟")');
     expect(source).toContain('addOption("calendar", "日历下方")');
     expect(source).toContain('addOption("sidebar", "独立侧栏")');
@@ -27,8 +27,8 @@ describe("focus timer settings UI", () => {
 
   it("updates only the focus settings region instead of rebuilding the whole page", () => {
     const focusSection = source.slice(
-      source.indexOf('text: "专注计时"'),
-      source.indexOf('text: "同步数据"'),
+      source.indexOf('setName("专注计时").setHeading()'),
+      source.indexOf('setName("同步数据").setHeading()'),
     );
     expect(focusSection).toContain("renderFocusOptions");
     expect(focusSection).not.toContain("this.display()");

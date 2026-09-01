@@ -30,13 +30,13 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
     const container = this.containerEl;
     container.empty();
     container.addClass("wc-settings");
-    container.createEl("h2", { text: "写作日历" });
+    new Setting(container).setName("写作日历").setHeading();
     container.createDiv({
       cls: "setting-item-description wc-settings-intro",
       text: "插件的启用和停用由 Obsidian 的第三方插件页面统一管理；这里仅设置统计口径、颜色、侧栏显示与写作项目。",
     });
 
-    container.createEl("h3", { text: "统计口径" });
+    new Setting(container).setName("统计口径").setHeading();
     new Setting(container)
       .setName("将粘贴计入手动输入")
       .setDesc("默认关闭。无论是否开启，粘贴始终单独保存，并始终计入增量。")
@@ -93,7 +93,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         }),
       );
 
-    container.createEl("h3", { text: "统计工作区" });
+    new Setting(container).setName("统计工作区").setHeading();
     container.createDiv({
       cls: "setting-item-description",
       text: "这是写作日历自己的默认统计范围，可与全部写作或命名项目切换。它可以按文件夹、标签、扩展名、文件名、Properties 和高级条件组合筛选；规则会作为普通仓库数据同步，不读取 Layout。",
@@ -137,7 +137,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         }),
       );
 
-    container.createEl("h3", { text: "侧栏" });
+    new Setting(container).setName("侧栏").setHeading();
     container.createDiv({
       cls: "setting-item-description",
       text: "侧栏只保留小日历与一行摘要；范围由上方“统计工作区”和下方“写作项目”独立维护。它不会读取或跟随 Chinese Writing Layout 的自动套用规则。",
@@ -180,7 +180,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
           await this.host.runtime.updatePreferences({ sidebarThreeWeeks });
         }),
       );
-    container.createEl("h4", { text: "侧栏摘要内容" });
+    new Setting(container).setName("侧栏摘要内容").setHeading();
     new Setting(container)
       .setName("显示本月字数")
       .addToggle((toggle) =>
@@ -211,7 +211,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         }),
       );
 
-    container.createEl("h3", { text: "写作目标" });
+    new Setting(container).setName("写作目标").setHeading();
     container.createDiv({
       cls: "setting-item-description",
       text: "在小日历最下侧显示每日目标，在新版工作台的「写作目标」模块显示每日 / 周 / 月目标与近 14 天回顾；目标范围跟随当前统计范围。",
@@ -269,7 +269,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
     scopeLabels.push(goalScopeLabel);
     updateScopeLabels();
 
-    container.createEl("h3", { text: "专注计时" });
+    new Setting(container).setName("专注计时").setHeading();
     container.createDiv({
       cls: "setting-item-description",
       text: "可选的单次专注计时。关闭时不显示计时界面，也不会判断空闲或计算写字速度。",
@@ -396,7 +396,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
      };
     renderFocusOptions();
 
-    container.createEl("h3", { text: "同步数据" });
+    new Setting(container).setName("同步数据").setHeading();
     new Setting(container)
       .setName("数据目录")
       .setDesc("这是普通仓库目录，可由 Remotely Save 等文件同步工具同步；插件不会主动触发云同步。")
@@ -446,7 +446,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         }),
       );
 
-    container.createEl("h3", { text: "写作项目" });
+    new Setting(container).setName("写作项目").setHeading();
     container.createDiv({
       cls: "setting-item-description",
       text: "项目规则完全由写作日历维护，可按文件夹、标签、扩展名、文件名、Properties 或高级筛选统计。它不会读取排版插件规则；同一文件可以同时属于多个项目。规则变更后会重新归集启用以来的历史。",
@@ -474,7 +474,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
       );
     }
     if (state.projectConflicts.length > 0) {
-      container.createEl("h4", { text: "需要处理的同步冲突" });
+      new Setting(container).setName("需要处理的同步冲突").setHeading();
       for (const conflict of state.projectConflicts) {
         const block = container.createDiv({ cls: "wc-conflict-block" });
         block.createEl("strong", { text: `项目 ${conflict.projectId} 有 ${conflict.heads.length} 个并行版本` });

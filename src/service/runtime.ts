@@ -1,4 +1,4 @@
-import { App, getAllTags, Notice, TFile } from "obsidian";
+import { App, getAllTags, Notice, Platform, TFile } from "obsidian";
 
 import { countBodyCharacters, countCreativeWords, countMarkdown } from "../core/counting";
 import {
@@ -63,6 +63,15 @@ export function localDateString(date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function platformLabel(): string {
+  if (Platform.isIosApp) return "iOS";
+  if (Platform.isAndroidApp) return "Android";
+  if (Platform.isMacOS) return "macOS";
+  if (Platform.isWin) return "Windows";
+  if (Platform.isLinux) return "Linux";
+  return Platform.isMobile ? "Mobile" : "Desktop";
 }
 
 function serializableProperties(value: unknown, depth = 0): Record<string, unknown> {
@@ -218,7 +227,7 @@ export class WritingCalendarRuntime {
       lastReadAt: this.state.lastLedgerRead || null,
       currentDevice: {
         deviceId: this.settings.deviceId,
-        userAgent: typeof navigator === "undefined" ? undefined : navigator.userAgent,
+        userAgent: typeof navigator === "undefined" ? undefined : platformLabel(),
       },
       ledger: this.ledgerReport,
       devices: this.deviceMetadata,
@@ -587,7 +596,7 @@ export class WritingCalendarRuntime {
       formatVersion: 1,
       deviceId: this.settings.deviceId,
       lastSeenAt: new Date().toISOString(),
-      userAgent: navigator.userAgent,
+      userAgent: platformLabel(),
     });
   }
 

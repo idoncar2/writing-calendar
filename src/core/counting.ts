@@ -129,7 +129,8 @@ function visibleMarkdownText(markdown: string): string {
   text = text.replace(/\\([\\`*_{}\[\]()#+\-.!>])/gu, "$1");
   text = text.replace(/(^|\n)[ \t]{0,3}(?:#{1,6}[ \t]+|>[ \t]?|[-+*][ \t]+|\d{1,9}[.)][ \t]+)/gu, "$1");
   text = text.replace(/(?:\*\*|__|~~)/gu, "");
-  text = text.replace(/(?<!\w)[*_](?=\S)|(?<=\S)[*_](?!\w)/gu, "");
+  text = text.replace(/(^|[^\w])[*_](?=\S)/gmu, "$1");
+  text = text.replace(/(\S)[*_](?!\w)/gu, "$1");
   text = text.replace(/[\[\]]/gu, "");
 
   return text;

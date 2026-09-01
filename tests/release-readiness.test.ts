@@ -15,11 +15,11 @@ describe("test release readiness", () => {
       version: string;
     };
     const versions = JSON.parse(readFileSync(resolve("versions.json"), "utf8")) as Record<string, string>;
-    expect(packageJson.version).toBe("0.3.11");
+    expect(packageJson.version).toBe("0.3.12");
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[""]?.version).toBe(packageJson.version);
     expect(manifest.version).toBe(packageJson.version);
-    expect(versions[packageJson.version]).toBe("1.5.0");
+    expect(versions[packageJson.version]).toBe("1.7.2");
   });
 
   it("keeps deployment configuration local and removes private paths", () => {

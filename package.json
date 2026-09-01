@@ -1,6 +1,6 @@
 {
   "name": "writing-calendar",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "Local-first writing activity calendar and analytics for Obsidian.",
   "main": "main.js",
   "type": "module",

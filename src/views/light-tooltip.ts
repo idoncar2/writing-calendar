@@ -27,21 +27,22 @@ export function showLightTooltip(
   for (const line of lines) tooltip.createDiv({ cls: "wc-tooltip-line", text: line });
   // 与视图保持一致强调色（自定义颜色时也一致）
   const accent = getComputedStyle(accentSource).getPropertyValue("--wc-accent").trim();
-  if (accent) tooltip.style.setProperty("--wc-accent", accent);
-  else tooltip.style.removeProperty("--wc-accent");
-  tooltip.style.display = "block";
+  tooltip.setCssProps({ "--wc-accent": accent });
+  tooltip.addClass("is-visible");
   const rect = anchor.getBoundingClientRect();
   const width = tooltip.offsetWidth;
   const height = tooltip.offsetHeight;
   const gap = 8;
   const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8);
   const top = Math.min(Math.max(8, rect.top - height - gap), window.innerHeight - height - 8);
-  tooltip.style.left = `${Math.round(left)}px`;
-  tooltip.style.top = `${Math.round(top)}px`;
+  tooltip.setCssProps({
+    "--wc-tooltip-left": `${Math.round(left)}px`,
+    "--wc-tooltip-top": `${Math.round(top)}px`,
+  });
 }
 
 export function hideLightTooltip(): void {
-  if (tooltipEl) tooltipEl.style.display = "none";
+  if (tooltipEl) tooltipEl.removeClass("is-visible");
 }
 
 /** 为元素绑定鼠标与键盘聚焦两种触发方式 */

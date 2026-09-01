@@ -3268,3 +3268,30 @@
     margin-top: 3px;
   }
 }
+
+
+/* Community review compatibility helpers */
+.wc-style-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.wc-tooltip {
+  display: none;
+  left: var(--wc-tooltip-left, 0px);
+  top: var(--wc-tooltip-top, 0px);
+}
+
+.wc-tooltip.is-visible {
+  display: block;
+}
+
+.wc-heatmap-months {
+  grid-template-columns: repeat(var(--wc-heat-columns, 1), var(--wc-heat-size, 10px));
+}
+
+.wc-heatmap-month-label {
+  grid-column: var(--wc-heat-label-column);
+  grid-row: 1;
+}

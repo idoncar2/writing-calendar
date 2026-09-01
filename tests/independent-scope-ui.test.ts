@@ -15,7 +15,7 @@ describe("independent scope settings UI", () => {
   });
 
   it("restores a calendar-owned workspace editor and exposes advanced filters", () => {
-    expect(settingsSource).toContain('text: "统计工作区"');
+    expect(settingsSource).toContain('setName("统计工作区").setHeading()');
     expect(settingsSource).toContain('setName("编辑工作区范围")');
     expect(settingsSource).toContain('setName("当前统计范围")');
     expect(settingsSource).toContain("WORKSPACE_SCOPE_ID");
