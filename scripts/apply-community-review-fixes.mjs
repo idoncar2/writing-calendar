@@ -130,4 +130,30 @@ const minAppVersion = "1.7.2";
   write(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+// 7) Keep source-inspection/release tests aligned with the community-compliant code.
+replaceOnce(
+  "tests/release-readiness.test.ts",
+  '    expect(packageJson.version).toBe("0.3.11");',
+  `    expect(packageJson.version).toBe("${newVersion}");`,
+);
+replaceOnce(
+  "tests/release-readiness.test.ts",
+  '    expect(versions[packageJson.version]).toBe("1.5.0");',
+  `    expect(versions[packageJson.version]).toBe("${minAppVersion}");`,
+);
+
+{
+  const path = "tests/focus-settings-ui.test.ts";
+  let source = read(path);
+  source = source.replaceAll('text: "专注计时"', 'setName("专注计时").setHeading()');
+  source = source.replaceAll('text: "同步数据"', 'setName("同步数据").setHeading()');
+  write(path, source);
+}
+
+replaceOnce(
+  "tests/independent-scope-ui.test.ts",
+  'text: "统计工作区"',
+  'setName("统计工作区").setHeading()',
+);
+
 console.log("Applied Obsidian community review compatibility fixes.");
