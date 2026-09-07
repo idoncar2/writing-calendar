@@ -4,6 +4,8 @@
 
 Writing Calendar 是一个本地优先的 Obsidian 写作统计插件，用侧栏日历、统计工作台、写作目标、专注计时和数据诊断记录真实的写作活动。
 
+*Writing Calendar is a local-first writing statistics plugin for Obsidian, featuring a sidebar calendar, statistics workbench, writing goals, focus sessions, and data diagnostics.*
+
 当前版本：`0.3.13`  
 最低支持 Obsidian：`1.7.2`
 
