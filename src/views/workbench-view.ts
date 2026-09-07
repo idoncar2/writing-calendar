@@ -1,4 +1,5 @@
 import { ItemView, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
+import { localizeRoot, t } from "../i18n";
 
 import { summarizeStreaks } from "../core/calendar";
 import { calculateFocusStatistics, type FocusSummary } from "../focus/statistics";
@@ -119,7 +120,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "统计工作台";
+    return t("统计工作台");
   }
 
   getIcon(): string {
@@ -207,6 +208,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
     const scrollTop = container.scrollTop;
     container.empty();
     container.addClass("wc-view", "wc-demo-view");
+    localizeRoot(container);
     applyViewAccent(container, this.host.settings.colorSource, this.host.settings.customColor);
     const snapshot = this.temporaryFilter
       ? this.host.runtime.getDashboardForFilter(this.temporaryFilter)
@@ -784,7 +786,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
     if (file instanceof TFile) {
       void this.host.app.workspace.getLeaf("tab").openFile(file);
     } else {
-      new Notice(`文件不存在：${path}`);
+      new Notice(t(`文件不存在：${path}`));
     }
   }
 

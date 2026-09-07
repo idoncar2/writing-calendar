@@ -1,4 +1,5 @@
 import { MarkdownView, Notice, Plugin, TFile, TFolder, type WorkspaceLeaf } from "obsidian";
+import { disposeI18n, localizeRoot, setUiLanguage, t } from "./i18n";
 
 import { FileExplorerCounts } from "./explorer-counts";
 import { FileIndex, type SerializedFileIndex } from "./index/file-index";
@@ -78,6 +79,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   async onload(): Promise<void> {
     const persisted = ((await this.loadData()) ?? {}) as PersistedPluginData & Record<string, unknown>;
     this.settings = normalizeSettings(persisted.settings ?? persisted);
+    setUiLanguage(this.settings.uiLanguage);
     this.settings.deviceId = new LocalDeviceIdentity(this.app.vault.getName()).getOrCreate(() => generatedId("device"));
     this.fileIndex = FileIndex.from(persisted.fileIndex, () => generatedId("file"));
     this.focusCheckpointStore = new LocalFocusCheckpointStore(this.app.vault.getName());
@@ -90,7 +92,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       onSessionEnded: (record) => this.recordFocusSession(record),
       onShortSessionDiscarded: () => {
         this.focusCheckpointStore.clear();
-        new Notice("专注不足 1 分钟，本次不记录");
+        new Notice(t("专注不足 1 分钟，本次不记录"));
       },
     });
     this.runtime = new WritingCalendarRuntime({
@@ -113,22 +115,22 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     this.addSettingTab(new WritingCalendarSettingTab(this.app, this, this));
     this.addCommand({
       id: "open-writing-calendar",
-      name: "打开写作日历",
+      name: t("打开写作日历"),
       callback: () => void this.openCalendar(),
     });
     this.addCommand({
       id: "open-writing-statistics-workbench",
-      name: "打开统计工作台",
+      name: t("打开统计工作台"),
       callback: () => void this.openWorkbench(),
     });
     this.addCommand({
       id: "open-focus-timer",
-      name: "打开专注计时",
+      name: t("打开专注计时"),
       callback: () => void this.openFocusView(),
     });
     this.addCommand({
       id: "rescan-writing-statistics",
-      name: "重新扫描当前文件统计",
+      name: t("重新扫描当前文件统计"),
       callback: () => void this.runtime.scanAllFiles(),
     });
 
@@ -143,6 +145,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     this.registerVaultEvents();
     this.statusBar = this.addStatusBarItem();
     this.statusBar.addClass("wc-status-bar");
+    localizeRoot(this.statusBar);
     this.statusBar.setAttribute("role", "button");
     this.statusBar.tabIndex = 0;
     this.statusBar.addEventListener("click", () => void this.openWorkbench());
@@ -156,7 +159,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     const loadedFocus = await this.focusStorage.loadSessions();
     this.focusRecords = this.mergeFocusRecords(loadedFocus.records);
     if (loadedFocus.warnings.length > 0) {
-      new Notice(`写作日历：已跳过 ${loadedFocus.warnings.length} 条损坏的专注记录。`);
+      new Notice(t(`写作日历：已跳过 ${loadedFocus.warnings.length} 条损坏的专注记录。`));
     }
     const localCheckpoint = this.focusCheckpointStore.load();
     if (localCheckpoint) this.focusController.recover(localCheckpoint);
@@ -214,6 +217,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     this.unsubscribeExplorer?.();
     this.explorerCounts?.clear();
     this.runtime?.dispose();
+    disposeI18n();
   }
 
   async openCalendar(): Promise<void> {
@@ -246,7 +250,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
 
   async openFocusView(): Promise<void> {
     if (!this.settings.focusEnabled) {
-      new Notice("请先在写作日历设置中启用番茄钟。", 5000);
+      new Notice(t("请先在写作日历设置中启用番茄钟。"), 5000);
       return;
     }
     let leaf = this.app.workspace.getLeavesOfType(WRITING_CALENDAR_FOCUS_VIEW_TYPE)[0];
@@ -372,7 +376,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       await this.saveLocalState();
     } catch (error) {
       console.error("写作日历：保存专注记录失败", error);
-      new Notice("专注记录保存失败，请检查数据目录。", 8000);
+      new Notice(t("专注记录保存失败，请检查数据目录。"), 8000);
     }
   }
 

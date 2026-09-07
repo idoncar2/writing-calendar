@@ -1,4 +1,5 @@
 import { ItemView, Notice, setIcon, WorkspaceLeaf } from "obsidian";
+import { localizeRoot, t } from "../i18n";
 
 import {
   formatDiagnosticReport,
@@ -85,7 +86,7 @@ export class DataDiagnosticsView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "数据诊断";
+    return t("数据诊断");
   }
 
   getIcon(): string {
@@ -106,6 +107,7 @@ export class DataDiagnosticsView extends ItemView {
     const container = this.contentEl;
     container.empty();
     container.addClass("wc-view", "wc-diagnostics-view");
+    localizeRoot(container);
     container.setAttribute("aria-busy", String(this.loading));
     applyViewAccent(container, this.host.settings.colorSource, this.host.settings.customColor);
 
@@ -336,10 +338,10 @@ export class DataDiagnosticsView extends ItemView {
     try {
       this.snapshot = await this.host.runtime.refreshDataDiagnostics();
       this.feedback = `检查完成：${formatDateTime(this.snapshot.checkedAt)}`;
-      new Notice("数据诊断已完成");
+      new Notice(t("数据诊断已完成"));
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : String(error);
-      new Notice("数据诊断失败，请稍后重试", 5000);
+      new Notice(t("数据诊断失败，请稍后重试"), 5000);
     } finally {
       this.loading = false;
       this.render();
@@ -353,10 +355,10 @@ export class DataDiagnosticsView extends ItemView {
       this.snapshot = this.host.runtime.getDataDiagnostics();
       this.feedback = "已将当前状态设为诊断基线";
       this.errorMessage = undefined;
-      new Notice("已设为当前基线");
+      new Notice(t("已设为当前基线"));
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : String(error);
-      new Notice("保存诊断基线失败，请稍后重试", 5000);
+      new Notice(t("保存诊断基线失败，请稍后重试"), 5000);
     }
     this.render();
   }
@@ -368,10 +370,10 @@ export class DataDiagnosticsView extends ItemView {
       await navigator.clipboard.writeText(formatDiagnosticReport(this.snapshot));
       this.feedback = "诊断报告已复制";
       this.errorMessage = undefined;
-      new Notice("诊断报告已复制");
+      new Notice(t("诊断报告已复制"));
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : String(error);
-      new Notice("复制诊断报告失败，请稍后重试", 5000);
+      new Notice(t("复制诊断报告失败，请稍后重试"), 5000);
     }
     this.render();
   }

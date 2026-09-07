@@ -1,4 +1,5 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { localizeRoot, refreshI18n, setUiLanguage, t, type UiLanguage } from "../i18n";
 
 import type { ActivityMetric, CalendarDisplay, CountMode } from "./model";
 import {
@@ -30,7 +31,25 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
     const container = this.containerEl;
     container.empty();
     container.addClass("wc-settings");
+    localizeRoot(container);
     new Setting(container).setName("写作日历").setHeading();
+    new Setting(container)
+      .setName("界面语言")
+      .setDesc("默认跟随 Obsidian 的界面语言，也可以手动选择。")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("auto", "自动（跟随 Obsidian）")
+          .addOption("zh-CN", "简体中文")
+          .addOption("en", "English")
+          .setValue(this.host.settings.uiLanguage)
+          .onChange(async (value) => {
+            const uiLanguage: UiLanguage = value === "zh-CN" || value === "en" ? value : "auto";
+            setUiLanguage(uiLanguage);
+            await this.host.runtime.updatePreferences({ uiLanguage });
+            refreshI18n();
+            this.display();
+          }),
+      );
     container.createDiv({
       cls: "setting-item-description wc-settings-intro",
       text: "插件的启用和停用由 Obsidian 的第三方插件页面统一管理；这里仅设置统计口径、颜色、侧栏显示与写作项目。",
@@ -419,7 +438,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         .addButton((button) =>
           button.setWarning().setButtonText("确认新建目录").onClick(async () => {
             await this.host.runtime.createMissingDataFolder();
-            new Notice("写作日历数据目录已建立");
+            new Notice(t("写作日历数据目录已建立"));
             this.display();
           }),
         );
@@ -430,7 +449,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
       .addButton((button) =>
         button.setButtonText("重新读取").onClick(async () => {
           await this.host.runtime.reloadSyncedData();
-          new Notice("同步账本已重新读取");
+          new Notice(t("同步账本已重新读取"));
           this.display();
         }),
       );
@@ -441,7 +460,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         button.setButtonText("重新扫描").onClick(async () => {
           button.setDisabled(true).setButtonText("扫描中…");
           await this.host.runtime.scanAllFiles();
-          new Notice("当前文件统计已校准");
+          new Notice(t("当前文件统计已校准"));
           this.display();
         }),
       );
@@ -466,9 +485,9 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
       );
       row.addExtraButton((button) =>
         button.setIcon("trash-2").setTooltip("删除项目").onClick(async () => {
-          if (!window.confirm(`确定删除项目“${project.name}”？历史账本不会被删除。`)) return;
+          if (!window.confirm(t(`确定删除项目“${project.name}”？历史账本不会被删除。`))) return;
           await this.host.runtime.deleteProject(project.id);
-          new Notice("项目已移入可恢复的版本历史");
+          new Notice(t("项目已移入可恢复的版本历史"));
           this.display();
         }),
       );
@@ -487,7 +506,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
           });
           button.addEventListener("click", async () => {
             await this.host.runtime.saveProject(head.definition);
-            new Notice("项目冲突已合并");
+            new Notice(t("项目冲突已合并"));
             this.display();
           });
         }

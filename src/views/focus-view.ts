@@ -1,4 +1,5 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
+import { localizeRoot, t } from "../i18n";
 
 import { applyViewAccent } from "./components";
 import type { WritingCalendarViewHost } from "./host";
@@ -19,7 +20,7 @@ export class WritingCalendarFocusView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "专注计时";
+    return t("专注计时");
   }
 
   getIcon(): string {
@@ -39,6 +40,7 @@ export class WritingCalendarFocusView extends ItemView {
     const container = this.contentEl;
     container.empty();
     container.addClass("wc-view", "wc-focus-view");
+    localizeRoot(container);
     applyViewAccent(container, this.host.settings.colorSource, this.host.settings.customColor);
     renderFocusTimer(container, this.host, { compact: false });
   }

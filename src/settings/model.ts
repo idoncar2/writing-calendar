@@ -5,9 +5,11 @@ export type ColorSource = "obsidian-accent" | "custom";
 export type HeatmapRange = "rolling-year" | "calendar-year";
 export type BarRange = "week" | "month" | "30-days" | "year";
 export type FocusDisplayMode = "calendar" | "sidebar";
+export type UiLanguage = "auto" | "zh-CN" | "en";
 
 export interface WritingCalendarSettings {
   schemaVersion: number;
+  uiLanguage: UiLanguage;
   deviceId: string;
   activationDate: string;
   selectedProjectId: string;
@@ -51,6 +53,7 @@ export const CURRENT_SETTINGS_SCHEMA_VERSION = 1 as const;
 
 export const DEFAULT_SETTINGS: WritingCalendarSettings = {
   schemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
+  uiLanguage: "auto",
   deviceId: "",
   activationDate: "",
   selectedProjectId: "workspace",
@@ -132,6 +135,7 @@ export function normalizeSettings(value: unknown): WritingCalendarSettings {
   return {
     ...preserveUnknownSettings(source),
     schemaVersion: schemaVersion(source.schemaVersion),
+    uiLanguage: choice(source.uiLanguage, ["auto", "zh-CN", "en"], "auto"),
     deviceId: typeof source.deviceId === "string" ? source.deviceId : "",
     activationDate: typeof source.activationDate === "string" ? source.activationDate : "",
     selectedProjectId: typeof source.selectedProjectId === "string"

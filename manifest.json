@@ -1,7 +1,7 @@
 {
   "id": "writing-calendar",
   "name": "Writing Calendar",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "minAppVersion": "1.7.2",
   "description": "记录本地写作活动，并用日历、热力图和条状图呈现。",
   "author": "idoncar2",

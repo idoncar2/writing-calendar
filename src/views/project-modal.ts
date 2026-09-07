@@ -1,4 +1,5 @@
 import { App, Modal, Notice, Setting } from "obsidian";
+import { localizeRoot, t } from "../i18n";
 
 import { parseProjectEditor, type ProjectEditorInput } from "../projects/editor-model";
 import { conditionTreeFromProjectFilter } from "../projects/scope-conditions";
@@ -19,6 +20,7 @@ export class ProjectEditorModal extends Modal {
 
   onOpen(): void {
     this.modalEl.addClass("wc-project-modal");
+    localizeRoot(this.modalEl);
     this.render();
   }
 
@@ -98,7 +100,7 @@ export class ProjectEditorModal extends Modal {
       save.setText("正在保存…");
       try {
         await this.runtime.saveProject(result.definition);
-        new Notice(isWorkspace ? "统计工作区已保存" : "写作项目已保存");
+        new Notice(t(isWorkspace ? "统计工作区已保存" : "写作项目已保存"));
         this.onSaved?.();
         this.close();
       } catch (error) {

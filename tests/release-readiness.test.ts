@@ -15,7 +15,7 @@ describe("test release readiness", () => {
       version: string;
     };
     const versions = JSON.parse(readFileSync(resolve("versions.json"), "utf8")) as Record<string, string>;
-    expect(packageJson.version).toBe("0.3.12");
+    expect(packageJson.version).toBe("0.3.13");
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[""]?.version).toBe(packageJson.version);
     expect(manifest.version).toBe(packageJson.version);
