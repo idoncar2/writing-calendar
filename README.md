@@ -1,87 +1,107 @@
 # Writing Calendar
 
-Writing Calendar 是一个本地优先的 Obsidian 写作统计插件，用日历和统计工作台记录真实的写作活动。
+**English** | [简体中文](./README.zh-CN.md)
 
-当前测试版：`0.3.11`
+Writing Calendar is a local-first writing statistics plugin for Obsidian. It records your actual writing activity and presents it through a compact calendar, a statistics workbench, writing goals, focus sessions, and data diagnostics.
 
-最低支持 Obsidian：`1.5.0`
+Current version: `0.3.13`  
+Minimum Obsidian version: `1.7.2`
 
-## 主要功能
+## Features
 
-- 右侧写作日历：以日期颜色展示写作强度，并提供本月、今日、连续写作和目标摘要。
-- 统计工作台：集中查看月历、年度热力图、每日数据、文件贡献、写作目标和专注统计。
-- 四项活动指标：手动输入、增量、删除量和净增。
-- 两种计数口径：创作字数与正文字符数。
-- 写作范围：内置可同步的“统计工作区”和命名项目，用选项式条件卡片组合文件夹、标签、扩展名、文件名与 Properties；每条可选 AND / OR 或排除（NOT）。
-- 写作目标：支持每日、每周和每月目标，以及最近一周回顾和月度打卡。
-- 可选专注计时：提供倒计时、暂停、休息、本次输入、净增、实际写作、空闲和离开时间统计。
-- 多设备数据：每台设备写入独立账本，合并时按记录 ID 去重，避免不同设备互相覆盖。
+- **Sidebar writing calendar** — See writing intensity by day, plus monthly, daily, streak, and goal summaries.
+- **Statistics workbench** — Review monthly activity, yearly heatmaps, daily details, file contributions, goals, and focus statistics.
+- **Multiple activity metrics** — Manual input, added text, deleted text, and net change.
+- **Two counting modes** — Creative word count and body character count.
+- **Writing scopes and projects** — Filter by folders, tags, extensions, file names, Properties, and advanced AND / OR / NOT conditions.
+- **Writing goals** — Daily, weekly, and monthly goals with recent progress review.
+- **Optional focus timer** — Countdown, pause, break, input, net change, active writing, idle, and away time.
+- **Multi-device data model** — Each device writes to its own ledger; synced records are merged and deduplicated by stable IDs.
+- **Data diagnostics** — Compare the current file statistics with a confirmed baseline to spot missing files, decreases, new files, renames, or moves.
+- **Bilingual interface** — Follow Obsidian automatically or choose Simplified Chinese / English manually.
 
-## 安装
+## Installation
 
-1. 从 Release 下载 `main.js`、`manifest.json` 和 `styles.css`，或下载完整 ZIP。
-2. 在仓库的 `.obsidian/plugins/` 下创建 `writing-calendar` 文件夹。
-3. 将三个插件文件放入该文件夹。
-4. 重启 Obsidian，在“设置 → 第三方插件”中启用 Writing Calendar。
+1. Download `main.js`, `manifest.json`, and `styles.css` from the latest GitHub Release, or download the release ZIP.
+2. Create `.obsidian/plugins/writing-calendar/` inside your vault.
+3. Put the three plugin files in that folder.
+4. Restart Obsidian and enable **Writing Calendar** under **Settings → Community plugins**.
 
-插件启用后会打开右侧日历。统计工作台和专注计时也可以从 Obsidian 命令面板打开。
+The sidebar calendar opens after the plugin is enabled. You can also open the statistics workbench, focus timer, and data diagnostics from the command palette or plugin settings where applicable.
 
-## 统计口径
+## Counting
 
-- 手动输入：键盘和输入法最终提交的内容；粘贴是否计入可在设置中选择。
-- 增量：插件识别到的所有新增内容，包括输入和粘贴。
-- 删除量：被移除的内容。
-- 净增：增量减去删除量，可以为负数。
+Writing Calendar keeps several activity metrics separate:
 
-“创作字数”按可见中文字符、连续英文单词和数字单位计数，并排除 YAML、代码和 Markdown 标记；“正文字符数”用于观察去除空白后的正文字符规模。
+- **Manual input** — Text committed through keyboard or IME. Whether pasted text is included can be configured.
+- **Added** — All newly detected content, including typing and paste.
+- **Deleted** — Content removed from the note.
+- **Net** — Added minus deleted; this value can be negative.
 
-## 写作范围与未来整合
+**Creative word count** counts visible CJK characters, continuous Latin-script words, and numeric runs while excluding YAML, code, and Markdown syntax. **Body characters** provide a broader view of non-whitespace body content.
 
-Writing Calendar 自己保存和匹配统计工作区与写作项目，不会读取、订阅或跟随 Chinese Writing Layout 的自动套用规则。新安装时默认选中“统计工作区”；尚未设置规则时，它等同于统计全部写作。保存规则后，工作区与普通项目一样存入 `写作日历数据/projects/` 并随仓库同步。
+## Writing scopes and projects
 
-工作区和项目使用同一套选项式规则卡片。文件夹、已有标签、扩展名和 Properties 字段会提供仓库内选项，也允许直接输入；每条条件可以选择与上一条的 `AND` / `OR` 关系，并可设为排除。旧版同类规则打开时会等价转换为条件组，统计范围不会改变。
+Writing Calendar manages its own statistics workspace and named writing projects. It does not depend on Chinese Writing Layout rules.
 
-高级筛选是日历内置的轻量表达式，不依赖 Dataview，并会再与可视条件同时满足。例如：
+Scopes can combine folders, tags, extensions, file names, Properties, and advanced conditions. A file may belong to multiple named projects.
+
+Advanced filters use a lightweight built-in expression syntax and do not require Dataview. For example:
 
 ```text
-folder("正文") AND tag("#小说") AND property("status") != "archived"
+folder("Drafts") AND tag("#novel") AND property("status") != "archived"
 ```
 
-它支持 `AND`、`OR`、`NOT` 和括号；可用 `folder()`、`tag()`、`extension()`、`filename()` 与 `property()` 组合条件。Properties 支持等于、不等于、包含、存在和不存在。
+Supported operators include `AND`, `OR`, `NOT`, and parentheses. Available conditions include `folder()`, `tag()`, `extension()`, `filename()`, and `property()`.
 
-统计工作台默认跟随设置中选中的范围。工作台顶部的“高级筛选”默认收起；应用临时筛选后，它会完整替代当前范围，清除后恢复。临时筛选关闭工作台时默认丢弃，只有勾选“保留筛选”才会按当前仓库保存在本机，不会覆盖同步的工作区或项目。
+The statistics workbench normally follows the selected scope. Temporary advanced filters can replace that scope for the current workbench session without overwriting the synced project definition.
 
-标签按 Obsidian 语义规范化：`#小说` 与 `小说` 等同，大小写不敏感，层级标签按完整标签精确匹配。未来如果增加整合式写作工作台，它可以通过插件公开的项目范围与统计接口协调多个模块，而不需要让日历依赖排版插件。
+## Focus timer
 
-## 专注计时
+The focus timer is optional and disabled by default. When enabled, it can appear below the sidebar calendar or in a separate sidebar view.
 
-番茄钟默认关闭，开启后可以显示在日历下方或独立侧栏。专注过程中只根据文字编辑活动估算实际写作和空闲时间；切出 Obsidian 或窗口不可见的时间记为离开时间。
+During an active session, Writing Calendar estimates active writing and idle time from actual text-edit activity. Time spent outside Obsidian or while the window is hidden is recorded separately as away time.
 
-手动结束且不足一分钟的专注默认不保存，也可以在设置中允许记录短专注。自然倒计时结束的专注会自动保存。
+Manually ended sessions shorter than one minute are not saved by default, though this behavior can be changed in settings. Sessions that reach the end of the countdown are saved automatically.
 
-## 数据与隐私
+## Data diagnostics
 
-插件不会上传正文，也不需要账号或网络服务。统计数据默认保存在仓库根目录的 `写作日历数据/`：
+Data diagnostics are designed as a warning system, not as a file-recovery system.
+
+You can create a confirmed baseline of current file statistics and compare it later against the current vault state. The diagnostics view can highlight:
+
+- files whose current count decreased;
+- files that disappeared;
+- newly detected files;
+- renamed or moved files.
+
+A diagnostic check does not rewrite historical ledgers. If a suspicious content change is found, use Obsidian's own File recovery or your sync provider's version history to inspect and restore the note.
+
+## Data, sync, and privacy
+
+Writing Calendar does not upload note content and does not require an account or network service. Statistics are stored in a normal vault folder, `写作日历数据/` by default:
 
 ```text
 写作日历数据/
-├─ devices/       设备信息
-├─ ledgers/       写作活动账本
-├─ projects/      统计工作区与写作项目规则
-└─ focus/         已完成的专注记录
+├─ devices/       device information
+├─ ledgers/       writing activity ledgers
+├─ projects/      statistics workspace and project rules
+└─ focus/         completed focus sessions
 ```
 
-该目录可以由用户已有的文件同步工具同步。插件只追加本设备的数据，并合并其他设备已经同步到本地的记录；正在运行的计时状态只保存在当前设备，不会被远端计时覆盖。
+You can sync this folder with the same file-sync solution you already use for the vault. Each device appends its own records, and Writing Calendar merges records that have already arrived locally through sync.
 
-删除缓存可以重新扫描当前文件总量，但历史活动和专注记录依赖账本，请不要随意删除 `写作日历数据/`。
+The currently running focus timer remains local to the device and is not handed off between devices.
 
-## 使用边界
+Do not delete the data folder casually: current file totals can be rescanned, but historical writing activity and completed focus sessions depend on the stored ledgers.
 
-- 写作活动从插件启用后开始记录，不根据旧文件时间虚构历史数据。
-- 没有对应本地编辑事务的外部文件变化只校准当前总字数，不计入某一天的写作量。
-- 插件不会修改 Markdown 正文，也不会向笔记写入私有标识。
-- 文件同步由用户选择的同步方式负责，插件本身不判断云端是否完成同步。
+## Limits
 
-## 许可证
+- Writing activity starts being recorded after the plugin is enabled; old file timestamps are not converted into invented writing history.
+- External file changes without a corresponding local edit transaction may update current totals but are not treated as writing activity for a specific day.
+- Writing Calendar does not modify Markdown content or insert private identifiers into notes.
+- File synchronization itself is handled by your chosen sync solution; the plugin does not decide whether cloud synchronization has finished.
+
+## License
 
 [MIT License](./LICENSE)
