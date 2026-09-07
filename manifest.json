@@ -3,7 +3,7 @@
   "name": "Writing Calendar",
   "version": "0.3.13",
   "minAppVersion": "1.7.2",
-  "description": "记录本地写作活动，并用日历、热力图和条状图呈现。",
+  "description": "Track local writing activity with calendars, heatmaps, goals, and focus sessions.",
   "author": "idoncar2",
   "isDesktopOnly": false
 }
