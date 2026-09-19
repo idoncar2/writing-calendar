@@ -1,0 +1,33 @@
+name: I18n audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/i18n-audit.yml"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: List Chinese UI strings
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          roots = [Path('src')]
+          for root in roots:
+              for p in sorted(root.rglob('*.ts')):
+                  lines = p.read_text(encoding='utf-8').splitlines()
+                  hits = []
+                  for i, line in enumerate(lines, 1):
+                      if re.search(r'[\u4e00-\u9fff]', line):
+                          hits.append((i, line.strip()))
+                  if hits:
+                      print(f'### {p}')
+                      for i, line in hits:
+                          print(f'{i}: {line}')
+          PY

@@ -19,7 +19,7 @@ describe("test release readiness", () => {
     expect(packageLock.version).toBe(packageJson.version);
     expect(packageLock.packages[""]?.version).toBe(packageJson.version);
     expect(manifest.version).toBe(packageJson.version);
-    expect(versions[packageJson.version]).toBe("1.5.0");
+    expect(versions[packageJson.version]).toBe("1.7.2");
   });
 
   it("keeps deployment configuration local and removes private paths", () => {

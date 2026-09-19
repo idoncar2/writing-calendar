@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const view = readFileSync(resolve("src/views/workbench-view.ts"), "utf8");
-const styles = readFileSync(resolve("styles.css"), "utf8");
+const styles = readFileSync(resolve("styles.css"), "utf8").replace(/\r\n/g, "\n");
 
 describe("workbench visual redesign", () => {
   it("groups the title, version, metric selector and tabs into one header hierarchy", () => {

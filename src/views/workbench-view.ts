@@ -1,5 +1,6 @@
 import { isStatisticsViewVisible } from "./visibility";
 import { ItemView, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
+import { localizeRoot, t } from "../i18n";
 
 import { summarizeStreaks } from "../core/calendar";
 import { calculateFocusStatistics, type FocusSummary } from "../focus/statistics";
@@ -121,7 +122,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "统计工作台";
+    return t("统计工作台");
   }
 
   getIcon(): string {
@@ -164,9 +165,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
   private logStyleSelfCheck(): void {
     try {
       const probe = createDiv();
-      probe.addClass("wc-view");
-      probe.style.position = "absolute";
-      probe.style.visibility = "hidden";
+      probe.addClass("wc-view", "wc-style-probe");
       const button = probe.createEl("button", { cls: "wc-day is-level-0", attr: { type: "button" } });
       document.body.appendChild(probe);
       const style = getComputedStyle(button);
@@ -222,6 +221,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
     const scrollTop = container.scrollTop;
     container.empty();
     container.addClass("wc-view", "wc-demo-view");
+    localizeRoot(container);
     applyViewAccent(container, this.host.settings.colorSource, this.host.settings.customColor);
     const snapshot = this.temporaryFilter
       ? this.host.runtime.getDashboardForFilter(this.temporaryFilter)
@@ -706,7 +706,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
     const offset = (startDate.getUTCDay() + 6) % 7;
     const columnCount = Math.max(1, Math.ceil((cells.length + offset) / 7));
     // 月份轨道与热力网格共用同一列宽模板并按实际列数生成，保证对齐不错位
-    months.style.gridTemplateColumns = `repeat(${columnCount}, var(--wc-heat-size, 10px))`;
+    months.setCssProps({ "--wc-heat-columns": String(columnCount) });
     for (const mark of buildHeatmapMonthMarks(cells, offset, columnCount)) {
       // 倒序布局：标签起点 = 该月在反转后最左的一列（而非右端），跨度用真实列数，
       // 保证标签与月份色块逐列对齐。
@@ -715,8 +715,8 @@ export class WritingCalendarWorkbenchView extends ItemView {
       const label = months.createSpan({ text: mark.text });
       const visualStart = columnCount - 1 - (mark.forwardColumn + mark.columnSpan - 1);
       const span = Math.max(1, Math.min(mark.columnSpan, columnCount - visualStart));
-      label.style.gridColumn = `${visualStart + 1} / span ${span}`;
-      label.style.gridRow = "1";
+      label.addClass("wc-heatmap-month-label");
+      label.setCssProps({ "--wc-heat-label-column": `${visualStart + 1} / span ${span}` });
     }
     const heatBody = scroll.createDiv({ cls: "wc-heatmap-body" });
     const weekdayLabels = heatBody.createDiv({ cls: "wc-heatmap-weekdays", attr: { "aria-hidden": "true" } });
@@ -799,7 +799,7 @@ export class WritingCalendarWorkbenchView extends ItemView {
     if (file instanceof TFile) {
       void this.host.app.workspace.getLeaf("tab").openFile(file);
     } else {
-      new Notice(`文件不存在：${path}`);
+      new Notice(t(`文件不存在：${path}`));
     }
   }
 

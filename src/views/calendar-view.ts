@@ -1,5 +1,6 @@
 import { isStatisticsViewVisible } from "./visibility";
 import { ItemView, Notice, setIcon, WorkspaceLeaf } from "obsidian";
+import { localizeRoot, t } from "../i18n";
 
 import { buildMonthGrid, summarizeStreaks } from "../core/calendar";
 import type { DailyActivity } from "../query/dashboard";
@@ -119,7 +120,7 @@ export class WritingCalendarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "写作日历";
+    return t("写作日历");
   }
 
   getIcon(): string {
@@ -155,6 +156,7 @@ export class WritingCalendarView extends ItemView {
     const container = this.contentEl;
     container.empty();
     container.addClass("wc-view", "wc-sidebar-view");
+    localizeRoot(container);
     applyViewAccent(container, this.host.settings.colorSource, this.host.settings.customColor);
 
     const snapshot = this.host.runtime.getDashboard();
@@ -194,7 +196,7 @@ export class WritingCalendarView extends ItemView {
       void (async () => {
         await this.host.runtime.reloadSyncedData();
         await this.host.runtime.scanAllFiles();
-        new Notice("已重新读取同步数据并重新扫描文件");
+        new Notice(t("已重新读取同步数据并重新扫描文件"));
       })();
     });
     const openButton = actions.createEl("button", { cls: "wc-open-workbench", type: "button" });
