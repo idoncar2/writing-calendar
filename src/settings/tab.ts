@@ -399,7 +399,7 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
     container.createEl("h3", { text: "同步数据" });
     new Setting(container)
       .setName("数据目录")
-      .setDesc("这是普通仓库目录，可由 Remotely Save 等文件同步工具同步；插件不会主动触发云同步。")
+      .setDesc("这是普通仓库目录，可由 Remotely Save + 阿里云同步；插件不会主动触发云同步。")
       .addText((text) => {
         text.setValue(this.host.settings.dataFolder).setDisabled(true);
       });

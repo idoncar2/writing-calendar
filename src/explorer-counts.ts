@@ -1,3 +1,4 @@
+import { isStatisticsViewVisible } from "./views/visibility";
 import type { App, TAbstractFile } from "obsidian";
 
 import type { WritingCalendarRuntime } from "./service/runtime";
@@ -59,6 +60,7 @@ export class FileExplorerCounts {
     for (const leaf of this.app.workspace.getLeavesOfType("file-explorer")) {
       const view = leaf.view as unknown as FileExplorerView | null;
       if (!view) continue;
+      if (enabled && view.containerEl && !isStatisticsViewVisible(view.containerEl, leaf, this.app)) continue;
       const folderSums = enabled && this.settings.showFolderCounts ? this.folderSums() : undefined;
 
       for (const [path, item] of Object.entries(view.fileItems ?? {})) {
@@ -77,8 +79,12 @@ export class FileExplorerCounts {
   }
 
   private setBadge(titleEl: HTMLElement, text: string | null): void {
-    titleEl.querySelector(`:scope > .${COUNT_CLASS}`)?.remove();
-    if (text === null) return;
+    const existing = titleEl.querySelector(`:scope > .${COUNT_CLASS}`);
+    if (text === null) { existing?.remove(); return; }
+    if (existing) {
+      if (existing.textContent !== text) existing.textContent = text;
+      return;
+    }
     const badge = document.createElement("span");
     badge.className = COUNT_CLASS;
     badge.setText(text);

@@ -20,6 +20,47 @@ const activity = (overrides: Partial<ActivityEvent> = {}): ActivityEvent => ({
 });
 
 describe("WritingCalendarEngine", () => {
+  it("does not revisit the whole history when appending an in-order event", () => {
+    let reads = 0;
+    const events = Array.from({ length: 100 }, (_, i) => {
+      const item = activity({ eventId: `old-${i}` });
+      Object.defineProperty(item, "extraMetadata", { enumerable: true, get: () => { reads++; return "kept"; } });
+      return item;
+    });
+    const engine = new WritingCalendarEngine({ fileIndex: new FileIndex(() => "unused"), events });
+    reads = 0;
+    engine.addEvent(activity({ eventId: "new", timestamp: "2026-08-25T12:00:00.000Z" }));
+    expect(reads).toBeLessThanOrEqual(1);
+    reads = 0;
+    engine.dashboard("all", "creative", false, "2026-08-25");
+    engine.goalSnapshot("all", "manual", 100, "creative", false, "2026-08-25");
+    expect(reads).toBe(0);
+  });
+
+  it("matches a full reload after out-of-order arrivals, conflicts and replacement ledgers", () => {
+    const index = new FileIndex(() => "unused");
+    const engine = new WritingCalendarEngine({ fileIndex: index });
+    const incoming = [
+      activity({ eventId: "b", timestamp: "2026-08-25T00:00:00Z" }),
+      activity({ eventId: "a", counts: { typed: 7, paste: 2, otherInserted: 1, deleted: 3 } }),
+      activity({ eventId: "b", path: "A.md", counts: { typed: 2, paste: 0, otherInserted: 0, deleted: 1 } }),
+      activity({ eventId: "a", counts: { typed: 7, paste: 2, otherInserted: 1, deleted: 3 } }),
+    ];
+    for (let i = 0; i < incoming.length; i++) {
+      engine.addEvent(incoming[i]);
+      const reference = new WritingCalendarEngine({ fileIndex: index, events: incoming.slice(0, i + 1) });
+      for (const mode of ["creative", "body-characters"] as const) {
+        expect(engine.dashboard("all", mode, true, "2026-08-25"))
+          .toEqual(reference.dashboard("all", mode, true, "2026-08-25"));
+      }
+    }
+    engine.setEvents([incoming[0]]);
+    engine.addEvent(incoming[1]);
+    expect(engine.dashboard("all", "creative", false, "2026-08-25"))
+      .toEqual(new WritingCalendarEngine({ fileIndex: index, events: incoming.slice(0, 2) })
+        .dashboard("all", "creative", false, "2026-08-25"));
+  });
+
   it("keeps historical paths for project attribution while exposing the current display path", () => {
     const index = FileIndex.from(
       {

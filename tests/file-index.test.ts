@@ -130,7 +130,7 @@ describe("FileIndex", () => {
     expect(index.listCurrent()).toEqual([recreated]);
   });
 
-  it("does not reuse an id when the same path has a different creation time", () => {
+  it("preserves identity when atomic replacement changes creation time", () => {
     let sequence = 0;
     const index = new FileIndex(() => `file-${++sequence}`);
     const originalInput = {
@@ -150,15 +150,15 @@ describe("FileIndex", () => {
       bodyCharacters: 2,
     });
 
-    expect(recreated.fileId).not.toBe(original.fileId);
-    expect(index.getById(original.fileId)).toMatchObject({ deleted: true });
+    expect(recreated.fileId).toBe(original.fileId);
+    expect(index.listAll()).toHaveLength(1);
     expect(index.getByPath("正文/第一章.md")).toMatchObject({
       fileId: recreated.fileId,
       ctime: 200,
     });
   });
 
-  it("uses the old snapshot mtime to detect recreation for legacy indexes without ctime", () => {
+  it("adopts ctime without replacing legacy identities", () => {
     const index = FileIndex.from(
       {
         formatVersion: 1,
@@ -187,8 +187,8 @@ describe("FileIndex", () => {
       properties: {},
     });
 
-    expect(recreated.fileId).toBe("file-new");
-    expect(index.getById("file-old")).toMatchObject({ deleted: true });
+    expect(recreated.fileId).toBe("file-old");
+    expect(index.listAll()).toHaveLength(1);
   });
 
   it("keeps an explicitly renamed file id even when its creation metadata changes", () => {
@@ -324,5 +324,24 @@ describe("FileIndex", () => {
 
     expect(index.inspect()).toMatchObject({ healthy: false });
     expect(index.inspect().issues).toContain("存在无法读取的文件索引记录");
+  });
+});
+
+
+describe("atomic replacement regression", () => {
+  it("keeps one identity across 20 rewrites, timestamp rollback, and cache reloads", () => {
+    let sequence = 0;
+    const createId = () => `file-${++sequence}`;
+    let index = new FileIndex(createId);
+    const input = { path: "log.md", mtime: 100, creative: 10, bodyCharacters: 20, properties: {} };
+    const originalId = index.upsert(input).fileId;
+    for (let edit = 1; edit <= 20; edit++) {
+      const updated = index.upsert({ ...input, ctime: 100 + edit * 10000,
+        mtime: edit === 10 ? 1 : 100 + edit * 10000, creative: edit });
+      expect(updated.fileId).toBe(originalId);
+      index = FileIndex.from(JSON.parse(JSON.stringify(index.serialize())), createId);
+    }
+    expect(index.inspect()).toMatchObject({ currentFileCount: 1, deletedFileCount: 0 });
+    expect(index.getByPath("log.md")?.ctime).toBe(200100);
   });
 });

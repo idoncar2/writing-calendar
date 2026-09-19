@@ -35,13 +35,20 @@ export function aggregateEvents(
   events: readonly ActivityEvent[],
   options: AggregateOptions = {},
 ): DailyFileAggregate[] {
+  // Public callers may supply overlapping device ledgers.
+  return aggregateUniqueEvents(dedupeEvents(events), options);
+}
+
+/** Internal fast path: the caller must already have resolved duplicate IDs. */
+export function aggregateUniqueEvents(
+  events: readonly ActivityEvent[],
+  options: AggregateOptions = {},
+): DailyFileAggregate[] {
   const includePasteInManual = options.includePasteInManual ?? false;
   const countMode = options.countMode ?? "creative";
   const groups = new Map<string, DailyFileAggregate>();
 
-  // Aggregation is often called directly on the union of device ledgers. The
-  // same ID must not be counted twice if a sync operation supplied duplicates.
-  for (const event of dedupeEvents(events)) {
+  for (const event of events) {
     const counts = activityCountsForMode(event, countMode);
 
     const fileId = event.fileId ?? "";

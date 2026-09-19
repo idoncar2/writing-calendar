@@ -1,7 +1,9 @@
-import { MarkdownView, Notice, Plugin, TFile, TFolder, type WorkspaceLeaf } from "obsidian";
+import { MarkdownView, Notice, Platform, Plugin, TFile, TFolder, type WorkspaceLeaf } from "obsidian";
 
 import { FileExplorerCounts } from "./explorer-counts";
-import { FileIndex, type SerializedFileIndex } from "./index/file-index";
+import { FileIndex } from "./index/file-index";
+import { backupBeforeIndexCompression, decodeFileIndex, encodeFileIndex, type StoredFileIndex } from "./storage/file-index-storage";
+import { CoalescedSave } from "./storage/coalesced-save";
 import { FocusController } from "./focus/controller";
 import { LocalDeviceIdentity } from "./focus/identity";
 import { LocalFocusCheckpointStore } from "./focus/local-state";
@@ -35,7 +37,7 @@ import {
 
 interface PersistedPluginData {
   settings?: unknown;
-  fileIndex?: SerializedFileIndex;
+  fileIndex?: StoredFileIndex;
 }
 
 interface SettingsController {
@@ -69,7 +71,8 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     return this.manifest.version;
   }
   private statusBar?: HTMLElement;
-  private saveQueue: Promise<void> = Promise.resolve();
+  private readonly localSaver = new CoalescedSave(() => this.persistLocalState());
+  private indexCompressionBackedUp = false;
   private unregisterModule?: () => void;
   private unsubscribeStatus?: () => void;
   private unsubscribeExplorer?: () => void;
@@ -79,7 +82,8 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     const persisted = ((await this.loadData()) ?? {}) as PersistedPluginData & Record<string, unknown>;
     this.settings = normalizeSettings(persisted.settings ?? persisted);
     this.settings.deviceId = new LocalDeviceIdentity(this.app.vault.getName()).getOrCreate(() => generatedId("device"));
-    this.fileIndex = FileIndex.from(persisted.fileIndex, () => generatedId("file"));
+    this.fileIndex = FileIndex.from(await decodeFileIndex(persisted.fileIndex), () => generatedId("file"));
+    this.indexCompressionBackedUp = persisted.fileIndex?.formatVersion === 2;
     this.focusCheckpointStore = new LocalFocusCheckpointStore(this.app.vault.getName());
     this.focusStorage = new FocusStorage(this.app.vault.adapter, this.settings.dataFolder);
     this.focusController = new FocusController({
@@ -95,6 +99,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     });
     this.runtime = new WritingCalendarRuntime({
       app: this.app,
+      isMobile: Platform.isMobile,
       settings: this.settings,
       fileIndex: this.fileIndex,
       saveLocalState: () => this.saveLocalState(),
@@ -138,7 +143,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
         const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!markdownView?.file) return;
         void this.runtime.recordActivity(markdownView.file, activity);
-      }),
+      }, () => this.runtime?.noteEditorActivity()),
     );
     this.registerVaultEvents();
     this.statusBar = this.addStatusBarItem();
@@ -417,7 +422,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
 
   private updateStatusBar(): void {
     if (!this.statusBar) return;
-    if (!this.settings.showStatusBar) {
+    if (Platform.isMobile || !this.settings.showStatusBar) {
       this.statusBar.hide();
       return;
     }
@@ -448,18 +453,20 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   }
 
   private saveLocalState(): Promise<void> {
-    const persist = async (): Promise<void> => {
-      // The device identity and running focus checkpoint are local-only. Keep
-      // the legacy settings field blank so synced plugin data cannot assign an
-      // identity to another machine.
-      const settings = { ...this.settings, deviceId: "" };
-      await this.saveData({ settings, fileIndex: this.fileIndex.serialize() });
-    };
-    const task = this.saveQueue.then(persist, persist);
-    this.saveQueue = task.then(
-      () => undefined,
-      () => undefined,
-    );
-    return task;
+    return this.localSaver.request();
+  }
+
+  private async persistLocalState(): Promise<void> {
+    // The device identity and running focus checkpoint are local-only. Keep
+    // the legacy settings field blank so synced plugin data cannot assign an
+    // identity to another machine.
+    const settings = { ...this.settings, deviceId: "" };
+    const fileIndex = await encodeFileIndex(this.fileIndex.serialize());
+    if (fileIndex.formatVersion === 2 && !this.indexCompressionBackedUp) {
+      const pluginDir = this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+      await backupBeforeIndexCompression(this.app.vault.adapter, pluginDir);
+      this.indexCompressionBackedUp = true;
+    }
+    await this.saveData({ settings, fileIndex });
   }
 }

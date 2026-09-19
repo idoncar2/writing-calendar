@@ -1,3 +1,4 @@
+import { isStatisticsViewVisible } from "./visibility";
 import { ItemView, Notice, setIcon, WorkspaceLeaf } from "obsidian";
 
 import {
@@ -71,6 +72,7 @@ function changeDetail(change: DiagnosticFileChange): string | undefined {
 
 export class DataDiagnosticsView extends ItemView {
   private unsubscribe?: () => void;
+  private renderPending = false;
   private snapshot?: DataDiagnosticSnapshot;
   private loading = false;
   private errorMessage?: string;
@@ -93,6 +95,8 @@ export class DataDiagnosticsView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.onResize()));
+    this.registerDomEvent(document, "visibilitychange", () => this.onResize());
     this.unsubscribe = this.host.runtime.subscribe(() => this.render());
     this.snapshot = this.host.runtime.getDataDiagnostics();
     this.render();
@@ -102,7 +106,16 @@ export class DataDiagnosticsView extends ItemView {
     this.unsubscribe?.();
   }
 
+  onResize(): void {
+    if (this.renderPending) this.render();
+  }
+
   private render(): void {
+    if (!isStatisticsViewVisible(this.contentEl, this.leaf, this.app)) {
+      this.renderPending = true;
+      return;
+    }
+    this.renderPending = false;
     const container = this.contentEl;
     container.empty();
     container.addClass("wc-view", "wc-diagnostics-view");

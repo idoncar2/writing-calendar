@@ -1,3 +1,4 @@
+import { isStatisticsViewVisible } from "./visibility";
 import { ItemView, Notice, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 
 import { summarizeStreaks } from "../core/calendar";
@@ -96,6 +97,7 @@ function fullDateLabel(date: string): string {
 
 export class WritingCalendarWorkbenchView extends ItemView {
   private unsubscribe?: () => void;
+  private renderPending = false;
   private unsubscribeFocus?: () => void;
   private unsubscribeFocusRecords?: () => void;
   private page: "writing" | "focus" = "writing";
@@ -140,6 +142,8 @@ export class WritingCalendarWorkbenchView extends ItemView {
       this.preserveFilter = false;
     }
     this.unsubscribe = this.host.runtime.subscribe(() => this.render());
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.onResize()));
+    this.registerDomEvent(document, "visibilitychange", () => this.onResize());
     this.unsubscribeFocus = this.host.focusController.subscribe(() => {
       if (this.page === "focus") this.render();
     });
@@ -204,7 +208,16 @@ export class WritingCalendarWorkbenchView extends ItemView {
     this.render();
   }
 
+  onResize(): void {
+    if (this.renderPending) this.render();
+  }
+
   private render(): void {
+    if (!isStatisticsViewVisible(this.contentEl, this.leaf, this.app)) {
+      this.renderPending = true;
+      return;
+    }
+    this.renderPending = false;
     const container = this.contentEl;
     const scrollTop = container.scrollTop;
     container.empty();

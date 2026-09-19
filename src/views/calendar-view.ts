@@ -1,3 +1,4 @@
+import { isStatisticsViewVisible } from "./visibility";
 import { ItemView, Notice, setIcon, WorkspaceLeaf } from "obsidian";
 
 import { buildMonthGrid, summarizeStreaks } from "../core/calendar";
@@ -100,6 +101,7 @@ function compactNumber(value: number): string {
 
 export class WritingCalendarView extends ItemView {
   private unsubscribe?: () => void;
+  private renderPending = false;
   private unsubscribeFocus?: () => void;
   private focusContainer?: HTMLElement;
   private year = new Date().getFullYear();
@@ -126,6 +128,8 @@ export class WritingCalendarView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.unsubscribe = this.host.runtime.subscribe(() => this.render());
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.onResize()));
+    this.registerDomEvent(document, "visibilitychange", () => this.onResize());
     this.unsubscribeFocus = this.host.focusController.subscribe(() => this.refreshFocusTimer());
     // 侧栏滚动时收起悬浮提示，避免定位停留在旧位置
     this.contentEl.addEventListener("scroll", () => hideLightTooltip(), { passive: true });
@@ -137,7 +141,16 @@ export class WritingCalendarView extends ItemView {
     this.unsubscribeFocus?.();
   }
 
+  onResize(): void {
+    if (this.renderPending) this.render();
+  }
+
   private render(): void {
+    if (!isStatisticsViewVisible(this.contentEl, this.leaf, this.app)) {
+      this.renderPending = true;
+      return;
+    }
+    this.renderPending = false;
     hideLightTooltip();
     const container = this.contentEl;
     container.empty();
@@ -213,6 +226,10 @@ export class WritingCalendarView extends ItemView {
   }
 
   private refreshFocusTimer(): void {
+    if (!isStatisticsViewVisible(this.contentEl, this.leaf, this.app)) {
+      this.renderPending = true;
+      return;
+    }
     if (!this.focusContainer?.isConnected) return;
     renderFocusTimer(this.focusContainer, this.host, { compact: true });
   }

@@ -36,6 +36,7 @@ function formatNumber(value: number): string {
 function formatSignedNumber(value: number): string {
   return value > 0 ? `+${formatNumber(value)}` : formatNumber(value);
 }
+
 const FOCUS_METRIC_TOOLTIPS: Record<string, string> = {
   "实际写作": "根据文字编辑活动估算",
   "空闲时间": "专注期间停留在 Obsidian，但较长时间没有编辑",

@@ -124,12 +124,16 @@ export class CalendarStorage {
       return { events: [], warnings: [], files: [], rawEventCount: 0, duplicateEventIds: [] };
     }
     const files = (await this.collectFiles(root)).filter((path) => path.toLowerCase().endsWith(".jsonl")).sort();
-    const ledgers: ActivityEvent[][] = [];
+    const rawEvents: ActivityEvent[] = [];
+    const counts = new Map<string, number>();
     const warnings: Array<JsonlWarning & { path: string }> = [];
     for (const path of files) {
       try {
         const decoded = decodeJsonl(await this.adapter.read(path));
-        ledgers.push(decoded.events);
+        for (const event of decoded.events) {
+          rawEvents.push(event);
+          counts.set(event.eventId, (counts.get(event.eventId) ?? 0) + 1);
+        }
         warnings.push(...decoded.warnings.map((warning) => ({ ...warning, path })));
       } catch (error) {
         warnings.push({
@@ -142,11 +146,8 @@ export class CalendarStorage {
         });
       }
     }
-    const rawEvents = ledgers.flat();
-    const counts = new Map<string, number>();
-    for (const event of rawEvents) counts.set(event.eventId, (counts.get(event.eventId) ?? 0) + 1);
     return {
-      events: mergeEvents(ledgers),
+      events: mergeEvents(rawEvents),
       warnings,
       files,
       rawEventCount: rawEvents.length,

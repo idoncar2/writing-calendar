@@ -2,9 +2,12 @@ import { App, getAllTags, Notice, TFile } from "obsidian";
 
 import { countBodyCharacters, countCreativeWords, countMarkdown } from "../core/counting";
 import {
+  appendDiagnosticDeviceEvent,
+  compactDiagnosticDeviceEvents,
+} from "../diagnostics/device-events";
+import {
   buildDataDiagnosticSnapshot,
   type DataDiagnosticSnapshot,
-  type DiagnosticDeviceEvent,
   type DiagnosticDeviceMetadata,
   type DiagnosticLedgerInput,
   type DiagnosticBaseline,
@@ -29,6 +32,8 @@ import {
 } from "../storage/calendar-storage";
 import type { TrackedEditorActivity } from "../tracking/codemirror";
 import { buildActivityEvent } from "./activity-event";
+import { ActivityTimezone } from "./activity-timezone";
+import { EditorIdleTasks } from "./editor-idle-tasks";
 import { WritingCalendarEngine, type WritingProjectOption } from "./engine";
 
 export interface RuntimeDiagnostic {
@@ -51,6 +56,7 @@ export interface WritingCalendarRuntimeOptions {
   fileIndex: FileIndex;
   saveLocalState: () => Promise<void>;
   diagnosticBaselineStore?: DiagnosticBaselineStore;
+  isMobile?: boolean;
 }
 
 function newId(prefix: string): string {
@@ -103,10 +109,7 @@ function diagnosticLedgerReport(loaded: LoadedEvents): DiagnosticLedgerInput {
       ...(warning.line === undefined ? {} : { line: warning.line }),
       message: warning.message,
     })),
-    deviceEvents: loaded.events.map<DiagnosticDeviceEvent>((event) => ({
-      deviceId: event.deviceId,
-      timestamp: event.timestamp,
-    })),
+    deviceEvents: compactDiagnosticDeviceEvents(loaded.events),
   };
 }
 
@@ -129,12 +132,10 @@ export class WritingCalendarRuntime {
   private diagnosticRefresh?: Promise<DataDiagnosticSnapshot>;
   private readonly listeners = new Set<() => void>();
   private readonly activityListeners = new Set<(event: ActivityEvent) => void>();
-  private readonly scanTimers = new Map<string, number>();
+  private readonly idleTasks: EditorIdleTasks;
+  private readonly activityTimezone = new ActivityTimezone();
   private scanAllFilesTask?: Promise<void>;
   private scanAgain = false;
-  private notifyTimer?: number;
-  private saveTimer?: number;
-  private reloadTimer?: number;
   private disposed = false;
   private state: RuntimeState = {
     dataFolderStatus: "missing",
@@ -149,6 +150,7 @@ export class WritingCalendarRuntime {
   readonly fileIndex: FileIndex;
 
   constructor(private readonly options: WritingCalendarRuntimeOptions) {
+    this.idleTasks = new EditorIdleTasks(options.isMobile ? 750 : 0);
     this.app = options.app;
     this.settings = options.settings;
     this.fileIndex = options.fileIndex;
@@ -180,11 +182,7 @@ export class WritingCalendarRuntime {
 
   dispose(): void {
     this.disposed = true;
-    for (const timer of this.scanTimers.values()) window.clearTimeout(timer);
-    this.scanTimers.clear();
-    if (this.notifyTimer !== undefined) window.clearTimeout(this.notifyTimer);
-    if (this.saveTimer !== undefined) window.clearTimeout(this.saveTimer);
-    if (this.reloadTimer !== undefined) window.clearTimeout(this.reloadTimer);
+    this.idleTasks.dispose();
     this.activityListeners.clear();
     void this.options.saveLocalState();
   }
@@ -318,11 +316,13 @@ export class WritingCalendarRuntime {
   }
 
   scheduleSyncedDataReload(): void {
-    if (this.reloadTimer !== undefined) window.clearTimeout(this.reloadTimer);
-    this.reloadTimer = window.setTimeout(() => {
-      this.reloadTimer = undefined;
+    this.idleTasks.schedule("reload", () => {
       void this.reloadSyncedData().catch((error) => this.reportError("重新读取同步数据失败", error));
     }, 500);
+  }
+
+  noteEditorActivity(): void {
+    this.idleTasks.noteActivity();
   }
 
   isDataPath(path: string): boolean {
@@ -334,6 +334,7 @@ export class WritingCalendarRuntime {
     let snapshot = this.fileIndex.getByPath(file.path);
     if (!snapshot) snapshot = await this.scanFile(file);
     if (!snapshot) return;
+    this.noteEditorActivity();
     const now = new Date();
     const event = buildActivityEvent({
       activity,
@@ -342,7 +343,7 @@ export class WritingCalendarRuntime {
       fileId: snapshot.fileId,
       path: snapshot.path,
       timestamp: now,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      timezone: this.activityTimezone.get(now.getTime()),
       localDate: localDateString(now),
     });
     try {
@@ -352,10 +353,10 @@ export class WritingCalendarRuntime {
         ...this.ledgerReport,
         eventCount: this.ledgerReport.eventCount + 1,
         rawEventCount: this.ledgerReport.rawEventCount + 1,
-        deviceEvents: [
-          ...this.ledgerReport.deviceEvents,
-          { deviceId: event.deviceId, timestamp: event.timestamp },
-        ],
+        deviceEvents: appendDiagnosticDeviceEvent(this.ledgerReport.deviceEvents, {
+          deviceId: event.deviceId,
+          timestamp: event.timestamp,
+        }),
       };
       this.engine.addEvent(event);
       for (const listener of this.activityListeners) listener(event);
@@ -372,13 +373,9 @@ export class WritingCalendarRuntime {
       this.scheduleSyncedDataReload();
       return;
     }
-    const previous = this.scanTimers.get(file.path);
-    if (previous !== undefined) window.clearTimeout(previous);
-    const timer = window.setTimeout(() => {
-      this.scanTimers.delete(file.path);
+    this.idleTasks.schedule(`scan:${file.path}`, () => {
       void this.scanFile(file).then(() => this.scheduleNotify()).catch((error) => this.reportError("更新文件统计失败", error, file.path));
     }, 1_000);
-    this.scanTimers.set(file.path, timer);
   }
 
   handleRename(file: TFile, oldPath: string): void {
@@ -592,19 +589,15 @@ export class WritingCalendarRuntime {
   }
 
   private scheduleLocalSave(): void {
-    if (this.saveTimer !== undefined) window.clearTimeout(this.saveTimer);
-    this.saveTimer = window.setTimeout(() => {
-      this.saveTimer = undefined;
+    this.idleTasks.schedule("save", () => {
       void this.options.saveLocalState().catch((error) => this.reportError("保存本地索引失败", error));
     }, 500);
   }
 
   private scheduleNotify(): void {
-    if (this.notifyTimer !== undefined || this.disposed) return;
-    this.notifyTimer = window.setTimeout(() => {
-      this.notifyTimer = undefined;
+    this.idleTasks.schedule("notify", () => {
       for (const listener of this.listeners) listener();
-    }, 80);
+    }, 80, false);
   }
 
   private addStorageWarning(warning: StorageWarning): void {

@@ -27,7 +27,7 @@ export function stableStringify(value: unknown): string {
   return JSON.stringify(canonical(value));
 }
 
-function eventSortKey(event: ActivityEvent): string {
+export function eventSortKey(event: ActivityEvent): string {
   return [
     event.timestamp,
     event.localDate,
@@ -41,17 +41,15 @@ function eventSortKey(event: ActivityEvent): string {
 
 /** Sort without mutating the caller's ledger. */
 export function sortEvents(events: EventCollection): ActivityEvent[] {
-  return [...events].sort((left, right) => {
-    const leftKey = eventSortKey(left);
-    const rightKey = eventSortKey(right);
-    if (leftKey < rightKey) {
+  return events.map((event) => ({ event, key: eventSortKey(event) })).sort((left, right) => {
+    if (left.key < right.key) {
       return -1;
     }
-    if (leftKey > rightKey) {
+    if (left.key > right.key) {
       return 1;
     }
     return 0;
-  });
+  }).map(({ event }) => event);
 }
 
 /**
@@ -62,32 +60,29 @@ export function sortEvents(events: EventCollection): ActivityEvent[] {
  * result independent of which device file was visited first and avoids
  * silently preferring a machine-local write order.
  */
-export function dedupeEvents(events: EventCollection): ActivityEvent[] {
-  const byId = new Map<string, { event: ActivityEvent; representation: string }>();
+export function dedupeEvents(events: Iterable<ActivityEvent>): ActivityEvent[] {
+  const byId = new Map<string, ActivityEvent>();
 
   for (const event of events) {
-    const representation = stableStringify(event);
     const existing = byId.get(event.eventId);
-    if (existing === undefined || representation < existing.representation) {
-      byId.set(event.eventId, { event, representation });
+    if (existing === undefined || (existing !== event && stableStringify(event) < stableStringify(existing))) {
+      byId.set(event.eventId, event);
     }
   }
 
-  return [...byId.values()].map(({ event }) => event);
+  return [...byId.values()];
 }
 
-function flattenLedgers(
+function* iterateLedgers(
   input: EventCollection | LedgerCollection,
-): ActivityEvent[] {
-  if (input.length === 0) {
-    return [];
-  }
-
+  moreLedgers: LedgerCollection,
+): Iterable<ActivityEvent> {
   if (Array.isArray(input[0])) {
-    return (input as LedgerCollection).flatMap((ledger) => [...ledger]);
+    for (const ledger of input as LedgerCollection) yield* ledger;
+  } else {
+    yield* input as EventCollection;
   }
-
-  return [...(input as EventCollection)];
+  for (const ledger of moreLedgers) yield* ledger;
 }
 
 /** Merge one or more device ledgers, dedupe IDs, then sort deterministically. */
@@ -98,10 +93,7 @@ export function mergeEvents(
   input: EventCollection | LedgerCollection,
   ...moreLedgers: EventCollection[]
 ): ActivityEvent[] {
-  const flattened = flattenLedgers(input);
-  return sortEvents(dedupeEvents(moreLedgers.length === 0
-    ? flattened
-    : [...flattened, ...moreLedgers.flatMap((ledger) => [...ledger])]));
+  return sortEvents(dedupeEvents(iterateLedgers(input, moreLedgers)));
 }
 
 export const mergeLedgers = mergeEvents;

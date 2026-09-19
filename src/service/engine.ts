@@ -1,6 +1,6 @@
 import type { FileIndex, FileSnapshot } from "../index/file-index";
-import { aggregateEvents } from "../ledger/aggregate";
-import { mergeEvents } from "../ledger/merge";
+import { aggregateUniqueEvents } from "../ledger/aggregate";
+import { eventSortKey, mergeEvents } from "../ledger/merge";
 import type { ActivityEvent, ActivityMetric, CountMode, DailyFileAggregate } from "../ledger/types";
 import { matchesProject } from "../projects/matcher";
 import type { ProjectDefinition, ProjectFilter } from "../projects/types";
@@ -33,20 +33,42 @@ export interface GoalSnapshot {
 }
 
 export class WritingCalendarEngine {
-  private events: ActivityEvent[];
+  private events: ActivityEvent[] = [];
+  private eventIds = new Set<string>();
   private projects: ProjectDefinition[];
 
   constructor(private readonly options: WritingCalendarEngineOptions) {
-    this.events = mergeEvents(options.events ?? []);
+    this.setEvents(options.events ?? []);
     this.projects = [...(options.projects ?? [])];
   }
 
   setEvents(events: readonly ActivityEvent[]): void {
     this.events = mergeEvents(events);
+    this.eventIds = new Set(this.events.map((event) => event.eventId));
   }
 
   addEvent(event: ActivityEvent): void {
-    this.events = mergeEvents([this.events, [event]]);
+    if (this.eventIds.has(event.eventId)) {
+      // Sync conflicts retain the same canonical winner as a complete reload.
+      this.setEvents([...this.events, event]);
+      return;
+    }
+    const key = eventSortKey(event);
+    const last = this.events[this.events.length - 1];
+    if (!last || key >= eventSortKey(last)) {
+      this.events.push(event);
+    } else {
+      // Clock changes or delayed events may arrive out of order.
+      let low = 0;
+      let high = this.events.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (eventSortKey(this.events[middle]) <= key) low = middle + 1;
+        else high = middle;
+      }
+      this.events.splice(low, 0, event);
+    }
+    this.eventIds.add(event.eventId);
   }
 
   setProjects(projects: readonly ProjectDefinition[]): void {
@@ -104,7 +126,7 @@ export class WritingCalendarEngine {
   ): DashboardSnapshot {
     const resolvedEvents = this.events
       .filter((event) => !definition || this.matchesDefinition(event, definition));
-    const rows = aggregateEvents(resolvedEvents, { countMode, includePasteInManual })
+    const rows = aggregateUniqueEvents(resolvedEvents, { countMode, includePasteInManual })
       .map((row) => this.withDisplayPath(row));
     const currentFiles = this.currentMatchingFiles(definition).map((snapshot) => ({
       fileId: snapshot.fileId,
@@ -131,7 +153,7 @@ export class WritingCalendarEngine {
     const definition = this.projects.find((project) => project.id === projectId);
     const resolvedEvents = this.events
       .filter((event) => !definition || this.matchesDefinition(event, definition));
-    const rows = aggregateEvents(resolvedEvents, { countMode, includePasteInManual });
+    const rows = aggregateUniqueEvents(resolvedEvents, { countMode, includePasteInManual });
 
     const perFile = new Map<string, number>();
     let current = 0;

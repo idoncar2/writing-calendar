@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as counting from "../src/core/counting";
 
 import { buildActivityEvent } from "../src/service/activity-event";
 import type { TrackedEditorActivity } from "../src/tracking/codemirror";
@@ -17,6 +18,14 @@ const tracked = (overrides: Partial<TrackedEditorActivity> = {}): TrackedEditorA
 });
 
 describe("activity event builder", () => {
+  it("parses each text once for both counting modes", () => {
+    const spy = vi.spyOn(counting, "countMarkdown");
+    try {
+      buildActivityEvent({ activity: tracked(), eventId: "a", deviceId: "d", fileId: "f", path: "a.md",
+        timestamp: new Date(), timezone: "UTC", localDate: "2026-09-17" });
+      expect(spy.mock.calls.map(([text]) => text)).toEqual(["你好 world 2026!", "旧"]);
+    } finally { spy.mockRestore(); }
+  });
   it("stores creative and compatible body-character buckets independently", () => {
     const event = buildActivityEvent({
       activity: tracked(),

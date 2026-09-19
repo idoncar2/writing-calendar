@@ -13,11 +13,7 @@ export interface BuildActivityEventOptions {
   localDate: string;
 }
 
-function buckets(activity: TrackedEditorActivity, mode: "creative" | "body-characters"): ActivityCounts {
-  const insertedVector = countMarkdown(activity.insertedText);
-  const deletedVector = countMarkdown(activity.deletedText);
-  const inserted = mode === "creative" ? countCreativeWords(insertedVector) : countBodyCharacters(insertedVector);
-  const deleted = mode === "creative" ? countCreativeWords(deletedVector) : countBodyCharacters(deletedVector);
+function buckets(activity: TrackedEditorActivity, inserted: number, deleted: number): ActivityCounts {
   const typed = activity.source === "typing" || activity.source === "ime" ? inserted : 0;
   const paste = activity.source === "paste" ? inserted : 0;
   const otherInserted = typed === 0 && paste === 0 ? inserted : 0;
@@ -25,6 +21,8 @@ function buckets(activity: TrackedEditorActivity, mode: "creative" | "body-chara
 }
 
 export function buildActivityEvent(options: BuildActivityEventOptions): ActivityEvent {
+  const inserted = countMarkdown(options.activity.insertedText);
+  const deleted = countMarkdown(options.activity.deletedText);
   return {
     eventId: options.eventId,
     deviceId: options.deviceId,
@@ -34,8 +32,8 @@ export function buildActivityEvent(options: BuildActivityEventOptions): Activity
     fileId: options.fileId,
     path: options.path,
     source: options.activity.source,
-    counts: buckets(options.activity, "creative"),
-    bodyCharacterCounts: buckets(options.activity, "body-characters"),
+    counts: buckets(options.activity, countCreativeWords(inserted), countCreativeWords(deleted)),
+    bodyCharacterCounts: buckets(options.activity, countBodyCharacters(inserted), countBodyCharacters(deleted)),
     formatVersion: ACTIVITY_FORMAT_VERSION,
   };
 }

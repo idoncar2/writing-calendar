@@ -6,6 +6,8 @@ import {
 } from "../src/ledger/jsonl";
 import {
   mergeEvents,
+  sortEvents,
+  dedupeEvents,
 } from "../src/ledger/merge";
 import type { ActivityEvent } from "../src/ledger/types";
 
@@ -80,6 +82,32 @@ describe("ledger JSONL", () => {
 });
 
 describe("ledger merge", () => {
+  it("consumes events once and does not serialize unique records to resolve nonexistent conflicts", () => {
+    let reads = 0;
+    const items = Array.from({ length: 50 }, (_, i) => {
+      const item = event({ eventId: `unique-${i}` });
+      Object.defineProperty(item, "extra", { enumerable: true, get: () => { reads++; return i; } });
+      return item;
+    });
+    expect(dedupeEvents(items)).toHaveLength(items.length);
+    expect(reads).toBe(0);
+    function* stream() { yield* items; yield items[0]; }
+    expect(dedupeEvents(stream())).toEqual(items);
+  });
+
+  it("computes canonical sort data at most once per event", () => {
+    let reads = 0;
+    const items = Array.from({ length: 200 }, (_, i) => {
+      const item = event({ eventId: `event-${(i * 73) % 200}` });
+      Object.defineProperty(item, "extra", { enumerable: true, get: () => { reads++; return i; } });
+      return item;
+    });
+    const expectedIds = items.map((item) => item.eventId).sort();
+    const sorted = sortEvents(items);
+    expect(sorted.map((item) => item.eventId)).toEqual(expectedIds);
+    expect(reads).toBeLessThanOrEqual(items.length);
+  });
+
   it("deduplicates stable event IDs and sorts merged device ledgers deterministically", () => {
     const first = event({
       eventId: "event-b",

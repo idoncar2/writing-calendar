@@ -1,3 +1,4 @@
+import { isStatisticsViewVisible } from "./visibility";
 import { ItemView, WorkspaceLeaf } from "obsidian";
 
 import { applyViewAccent } from "./components";
@@ -9,6 +10,7 @@ export const WRITING_CALENDAR_FOCUS_VIEW_TYPE = "writing-calendar-focus";
 /** Independent sidebar view backed by the same controller as the calendar module. */
 export class WritingCalendarFocusView extends ItemView {
   private unsubscribe?: () => void;
+  private renderPending = false;
 
   constructor(leaf: WorkspaceLeaf, private readonly host: WritingCalendarViewHost) {
     super(leaf);
@@ -27,6 +29,8 @@ export class WritingCalendarFocusView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.registerEvent(this.app.workspace.on("layout-change", () => this.onResize()));
+    this.registerDomEvent(document, "visibilitychange", () => this.onResize());
     this.unsubscribe = this.host.focusController.subscribe(() => this.render());
     this.render();
   }
@@ -35,7 +39,16 @@ export class WritingCalendarFocusView extends ItemView {
     this.unsubscribe?.();
   }
 
+  onResize(): void {
+    if (this.renderPending) this.render();
+  }
+
   private render(): void {
+    if (!isStatisticsViewVisible(this.contentEl, this.leaf, this.app)) {
+      this.renderPending = true;
+      return;
+    }
+    this.renderPending = false;
     const container = this.contentEl;
     container.empty();
     container.addClass("wc-view", "wc-focus-view");

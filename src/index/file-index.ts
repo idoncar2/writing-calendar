@@ -1,6 +1,6 @@
 export interface FileSnapshotInput {
   path: string;
-  /** File creation time, used to distinguish same-path recreation after downtime. */
+  /** Observed creation time; atomic writes and sync may change it without changing identity. */
   ctime?: number;
   mtime: number;
   creative: number;
@@ -57,14 +57,6 @@ function isWithinFolder(path: string, folder: string): boolean {
 
 function finiteTimestamp(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
-}
-
-function isRecreatedFile(existing: FileSnapshot, input: FileSnapshotInput): boolean {
-  if (!finiteTimestamp(input.ctime)) return false;
-  if (finiteTimestamp(existing.ctime)) return existing.ctime !== input.ctime;
-  // Legacy snapshots did not persist ctime. A creation time after the last
-  // observed mtime is the safe signal available for a same-path replacement.
-  return finiteTimestamp(existing.mtime) && input.ctime > existing.mtime;
 }
 
 function replaceFolderPrefix(path: string, oldFolder: string, newFolder: string): string {
@@ -137,25 +129,21 @@ export class FileIndex {
     if (existingId) {
       const existing = this.byId.get(existingId);
       if (!existing) throw new Error("File index is internally inconsistent.");
-      if (isRecreatedFile(existing, input)) {
-        existing.deleted = true;
-        existing.deletedAt = Date.now();
-        this.idByPath.delete(path);
-      } else {
-        const ctime = finiteTimestamp(input.ctime) ? input.ctime : undefined;
-        Object.assign(existing, {
-          path,
-          ...(ctime === undefined ? {} : { ctime }),
-          mtime: input.mtime,
-          creative: input.creative,
-          bodyCharacters: input.bodyCharacters,
-          tags: tags(input.tags),
-          properties: { ...input.properties },
-          deleted: false,
-        });
-        delete existing.deletedAt;
-        return existing;
-      }
+      // An indexed path keeps its identity until a deletion is observed.
+      // Neither ctime changes nor mtime rollback distinguish sync from recreation.
+      const ctime = finiteTimestamp(input.ctime) ? input.ctime : undefined;
+      Object.assign(existing, {
+        path,
+        ...(ctime === undefined ? {} : { ctime }),
+        mtime: input.mtime,
+        creative: input.creative,
+        bodyCharacters: input.bodyCharacters,
+        tags: tags(input.tags),
+        properties: { ...input.properties },
+        deleted: false,
+      });
+      delete existing.deletedAt;
+      return existing;
     }
 
     const fileId = this.createId();
@@ -289,8 +277,8 @@ export class FileIndex {
   }
 
   listCurrent(): FileSnapshot[] {
-    return [...this.byId.values()]
-      .filter((snapshot) => !snapshot.deleted)
+    return [...this.idByPath.values()]
+      .map((fileId) => this.byId.get(fileId)!)
       .sort((left, right) => left.path.localeCompare(right.path));
   }
 
@@ -301,13 +289,19 @@ export class FileIndex {
   inspect(): FileIndexHealth {
     const issues = [...this.loadIssues];
     const ownerByPath = new Map<string, string>();
+    let currentFileCount = 0;
+    let deletedFileCount = 0;
+    let aliasedFileCount = 0;
     for (const snapshot of this.byId.values()) {
+      if (snapshot.aliases.length > 0) aliasedFileCount++;
       if (snapshot.deleted) {
+        deletedFileCount++;
         if (this.idByPath.get(snapshot.path) === snapshot.fileId) {
           issues.push(`已删除文件仍在当前路径索引: ${snapshot.path}`);
         }
         continue;
       }
+      currentFileCount++;
       const owner = ownerByPath.get(snapshot.path);
       if (owner && owner !== snapshot.fileId) issues.push(`多个文件共享当前路径: ${snapshot.path}`);
       ownerByPath.set(snapshot.path, snapshot.fileId);
@@ -322,14 +316,12 @@ export class FileIndex {
       }
     }
     const uniqueIssues = [...new Set(issues)];
-    const current = this.listCurrent();
-    const all = this.listAll();
     return {
       healthy: uniqueIssues.length === 0,
       issues: uniqueIssues,
-      currentFileCount: current.length,
-      deletedFileCount: all.filter((snapshot) => snapshot.deleted).length,
-      aliasedFileCount: all.filter((snapshot) => snapshot.aliases.length > 0).length,
+      currentFileCount,
+      deletedFileCount,
+      aliasedFileCount,
     };
   }
 
