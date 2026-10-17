@@ -33,6 +33,7 @@ function setup() {
   };
   const fileIndex = {
     getByPath: (path: string) => snapshots[path],
+    getById: (id: string) => Object.values(snapshots).find((snapshot) => snapshot.fileId === id),
     listCurrent: () => [],
     upsert: vi.fn(),
   };
