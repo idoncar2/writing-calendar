@@ -3,6 +3,7 @@ import { disposeI18n, localizeRoot, setUiLanguage, t } from "./i18n";
 
 import { FileExplorerCounts } from "./explorer-counts";
 import { FileIndex } from "./index/file-index";
+import { StartupProfiler } from "./diagnostics/startup-profiler";
 import { backupBeforeIndexCompression, decodeFileIndex, encodeFileIndex, type StoredFileIndex } from "./storage/file-index-storage";
 import { CoalescedSave } from "./storage/coalesced-save";
 import { FocusController } from "./focus/controller";
@@ -56,6 +57,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   runtime!: WritingCalendarRuntime;
   focusController!: FocusController;
   private fileIndex!: FileIndex;
+  private readonly startupProfiler = new StartupProfiler();
   private focusStorage!: FocusStorage<FocusSessionRecord>;
   private focusCheckpointStore!: LocalFocusCheckpointStore;
   private focusRecords: FocusSessionRecord[] = [];
@@ -80,11 +82,22 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   private explorerCounts!: FileExplorerCounts;
 
   async onload(): Promise<void> {
+    const endDataRead = this.startupProfiler.begin("读取插件 data.json");
     const persisted = ((await this.loadData()) ?? {}) as PersistedPluginData & Record<string, unknown>;
+    endDataRead();
+    this.startupProfiler.count("索引压缩字符量", persisted.fileIndex?.formatVersion === 2 && "data" in persisted.fileIndex
+      ? (typeof persisted.fileIndex.data === "string" ? persisted.fileIndex.data.length : 0)
+      : 0);
     this.settings = normalizeSettings(persisted.settings ?? persisted);
     setUiLanguage(this.settings.uiLanguage);
     this.settings.deviceId = new LocalDeviceIdentity(this.app.vault.getName()).getOrCreate(() => generatedId("device"));
-    this.fileIndex = FileIndex.from(await decodeFileIndex(persisted.fileIndex), () => generatedId("file"));
+    const endIndexDecode = this.startupProfiler.begin("文件索引解压");
+    const restoredIndex = await decodeFileIndex(persisted.fileIndex);
+    endIndexDecode();
+    const endIndexRebuild = this.startupProfiler.begin("文件索引建立");
+    this.fileIndex = FileIndex.from(restoredIndex, () => generatedId("file"));
+    endIndexRebuild();
+    this.startupProfiler.count("索引当前文件数", this.fileIndex.listCurrent().length);
     this.indexCompressionBackedUp = persisted.fileIndex?.formatVersion === 2;
     this.focusCheckpointStore = new LocalFocusCheckpointStore(this.app.vault.getName());
     this.focusStorage = new FocusStorage(this.app.vault.adapter, this.settings.dataFolder);
@@ -105,6 +118,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       settings: this.settings,
       fileIndex: this.fileIndex,
       saveLocalState: () => this.saveLocalState(),
+      startupProfiler: this.startupProfiler,
     });
 
     this.registerView(WRITING_CALENDAR_VIEW_TYPE, (leaf) => new WritingCalendarView(leaf, this));
@@ -134,6 +148,11 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       callback: () => void this.openFocusView(),
     });
     this.addCommand({
+      id: "copy-startup-performance-report",
+      name: "复制本次启动性能诊断",
+      callback: () => void this.copyStartupPerformanceReport(),
+    });
+    this.addCommand({
       id: "rescan-writing-statistics",
       name: t("重新扫描当前文件统计"),
       callback: () => void this.runtime.scanAllFiles(),
@@ -144,9 +163,11 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
         if (!editorView.hasFocus) return;
         const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!markdownView?.file) return;
+        this.startupProfiler.mark("首次输入事件被插件捕获");
         void this.runtime.recordActivity(markdownView.file, activity);
       }, () => this.runtime?.noteEditorActivity()),
     );
+    this.startupProfiler.mark("输入监听安装完成");
     this.registerVaultEvents();
     this.statusBar = this.addStatusBarItem();
     this.statusBar.addClass("wc-status-bar");
@@ -161,7 +182,10 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     });
 
     await this.runtime.initialize();
+    this.startupProfiler.mark("历史统计与全库扫描完成");
+    const endFocusRestore = this.startupProfiler.begin("专注记录读取");
     const loadedFocus = await this.focusStorage.loadSessions();
+    endFocusRestore();
     this.focusRecords = this.mergeFocusRecords(loadedFocus.records);
     if (loadedFocus.warnings.length > 0) {
       new Notice(t(`写作日历：已跳过 ${loadedFocus.warnings.length} 条损坏的专注记录。`));
@@ -192,6 +216,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     this.unsubscribeExplorer = this.runtime.subscribe(() => this.explorerCounts.refresh());
     this.registerModuleApi();
     this.app.workspace.onLayoutReady(() => {
+      this.startupProfiler.mark("工作区布局就绪");
       this.explorerCounts.refresh();
       if (
         this.settings.focusEnabled &&
@@ -208,6 +233,21 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
         await this.saveLocalState();
       });
     });
+    this.startupProfiler.mark("插件 onload 完成");
+  }
+
+  getStartupPerformanceReport(): string {
+    return this.startupProfiler.formatReport(this.manifest.version);
+  }
+
+  private async copyStartupPerformanceReport(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.getStartupPerformanceReport());
+      new Notice("启动性能报告已复制，可直接粘贴反馈。");
+    } catch (error) {
+      console.info("写作日历启动性能报告：\n" + this.getStartupPerformanceReport());
+      new Notice("复制失败，报告已输出至开发者控制台。");
+    }
   }
 
   onunload(): void {
@@ -465,12 +505,19 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     // the legacy settings field blank so synced plugin data cannot assign an
     // identity to another machine.
     const settings = { ...this.settings, deviceId: "" };
+    const endIndexSave = this.startupProfiler.begin("索引序列化与压缩");
     const fileIndex = await encodeFileIndex(this.fileIndex.serialize());
+    endIndexSave();
     if (fileIndex.formatVersion === 2 && !this.indexCompressionBackedUp) {
       const pluginDir = this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
       await backupBeforeIndexCompression(this.app.vault.adapter, pluginDir);
       this.indexCompressionBackedUp = true;
     }
-    await this.saveData({ settings, fileIndex });
+    const endDataSave = this.startupProfiler.begin("保存 data.json");
+    try {
+      await this.saveData({ settings, fileIndex });
+    } finally {
+      endDataSave();
+    }
   }
 }
