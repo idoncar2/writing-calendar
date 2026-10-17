@@ -214,9 +214,7 @@ export class WritingCalendarView extends ItemView {
     if (state.initializing) {
       container.createDiv({
         cls: "wc-inline-status",
-        text: state.recordingReady
-          ? "写作记录已开启，正在加载历史统计…"
-          : "正在准备写作记录，输入会暂存并补记…",
+        text: "正在加载历史统计，启动期间的输入会暂存并补记…",
         attr: { role: "status" },
       });
     } else if (state.paused) {
