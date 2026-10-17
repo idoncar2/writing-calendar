@@ -246,6 +246,9 @@ export class WritingCalendarRuntime {
       if (this.disposed) return;
       if (!this.state.paused) {
         await this.writeDeviceMetadata();
+        // Edits and local metadata written before this point are included in
+        // the initial read. Only sync changes during that read need a retry.
+        this.pendingSyncedReload = false;
         await this.reloadSyncedData(false);
         // A synchronization notification during hydration needs a second read.
         if (this.pendingSyncedReload) {
@@ -274,7 +277,13 @@ export class WritingCalendarRuntime {
       throw error;
     } finally {
       this.state.initializing = false;
-      if (!this.disposed) this.scheduleNotify();
+      if (!this.disposed) {
+        if (this.historyReady && this.pendingSyncedReload) {
+          this.pendingSyncedReload = false;
+          this.scheduleSyncedDataReload();
+        }
+        this.scheduleNotify();
+      }
     }
   }
 
@@ -445,7 +454,7 @@ export class WritingCalendarRuntime {
   }
 
   scheduleSyncedDataReload(): void {
-    if (!this.historyReady) {
+    if (!this.historyReady || this.state.initializing) {
       this.pendingSyncedReload = true;
       return;
     }
