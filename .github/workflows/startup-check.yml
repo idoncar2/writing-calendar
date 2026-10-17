@@ -24,3 +24,13 @@ jobs:
         run: npm ci
       - name: Run tests and compile
         run: npm run check
+      - name: Prepare Obsidian mobile test package
+        run: |
+          mkdir -p writing-calendar
+          cp main.js manifest.json styles.css writing-calendar/
+      - name: Upload installable test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: writing-calendar-mobile-test
+          path: writing-calendar/
+          retention-days: 14
