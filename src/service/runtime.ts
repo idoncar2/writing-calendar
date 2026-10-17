@@ -16,7 +16,7 @@ import {
 import { LocalDiagnosticBaselineStore, type DiagnosticBaselineStore } from "../diagnostics/storage";
 import { FileIndex } from "../index/file-index";
 import { missingVaultPaths } from "../index/reconcile";
-import { retryFailedItems } from "../index/scan";
+import { isUnchangedSnapshot, retryFailedItems } from "../index/scan";
 import type { ActivityEvent } from "../ledger/types";
 import { resolveProjectVersions, createProjectVersion, type ProjectVersionConflict, type ProjectVersionRecord } from "../projects/versions";
 import type { ProjectDefinition, ProjectFilter } from "../projects/types";
@@ -145,6 +145,9 @@ export class WritingCalendarRuntime {
   private readonly activityTimezone = new ActivityTimezone();
   private scanAllFilesTask?: Promise<void>;
   private scanAgain = false;
+  private rescanRequiresFull = false;
+  private activityReady = false;
+  private readonly pendingActivities: Array<{ file: TFile; activity: TrackedEditorActivity; at: Date }> = [];
   private disposed = false;
   private state: RuntimeState = {
     dataFolderStatus: "missing",
@@ -183,7 +186,18 @@ export class WritingCalendarRuntime {
       await this.writeDeviceMetadata();
       await this.reloadSyncedData(false);
     }
-    await this.scanAllFiles();
+    // Historical events and project definitions are ready. Flush real edits
+    // captured while startup was deferred, before beginning the vault scan.
+    this.activityReady = true;
+    const pending = this.pendingActivities.splice(0);
+    if (!this.state.paused) {
+      for (const item of pending) {
+        if (this.disposed || this.state.paused) break;
+        await this.recordReadyActivity(item.file, item.activity, item.at);
+      }
+    }
+    if (this.disposed) return;
+    await this.scanAllFiles(true);
     if (!this.settings.activationDate) this.settings.activationDate = localDateString();
     await this.options.saveLocalState();
     this.scheduleNotify();
@@ -193,7 +207,9 @@ export class WritingCalendarRuntime {
     this.disposed = true;
     this.idleTasks.dispose();
     this.activityListeners.clear();
-    void this.options.saveLocalState();
+    this.pendingActivities.length = 0;
+    // Avoid writing out an incomplete index if disabled during startup.
+    if (this.activityReady) void this.options.saveLocalState();
   }
 
   subscribe(listener: () => void): () => void {
@@ -339,21 +355,31 @@ export class WritingCalendarRuntime {
   }
 
   async recordActivity(file: TFile, activity: TrackedEditorActivity): Promise<void> {
-    if (this.state.paused || this.disposed || this.isDataPath(file.path)) return;
+    if (this.disposed || this.isDataPath(file.path)) return;
+    const at = new Date();
+    this.noteEditorActivity();
+    if (!this.activityReady) {
+      this.pendingActivities.push({ file, activity, at });
+      return;
+    }
+    if (this.state.paused) return;
+    await this.recordReadyActivity(file, activity, at);
+  }
+
+  private async recordReadyActivity(file: TFile, activity: TrackedEditorActivity, at: Date): Promise<void> {
+    if (this.disposed || this.state.paused) return;
     let snapshot = this.fileIndex.getByPath(file.path);
     if (!snapshot) snapshot = await this.scanFile(file);
     if (!snapshot) return;
-    this.noteEditorActivity();
-    const now = new Date();
     const event = buildActivityEvent({
       activity,
       eventId: newId("evt"),
       deviceId: this.settings.deviceId,
       fileId: snapshot.fileId,
       path: snapshot.path,
-      timestamp: now,
-      timezone: this.activityTimezone.get(now.getTime()),
-      localDate: localDateString(now),
+      timestamp: at,
+      timezone: this.activityTimezone.get(at.getTime()),
+      localDate: localDateString(at),
     });
     try {
       await this.storage.appendEvent(event);
@@ -439,16 +465,20 @@ export class WritingCalendarRuntime {
     this.scheduleNotify();
   }
 
-  async scanAllFiles(): Promise<void> {
+  async scanAllFiles(skipUnchanged = false): Promise<void> {
     if (this.scanAllFilesTask) {
       this.scanAgain = true;
+      this.rescanRequiresFull ||= !skipUnchanged;
       return this.scanAllFilesTask;
     }
 
     const task = (async () => {
+      let incremental = skipUnchanged;
       do {
         this.scanAgain = false;
-        await this.performFullScan();
+        this.rescanRequiresFull = false;
+        await this.performFullScan(incremental);
+        incremental = !this.rescanRequiresFull;
       } while (this.scanAgain && !this.disposed);
     })();
     this.scanAllFilesTask = task;
@@ -459,18 +489,24 @@ export class WritingCalendarRuntime {
     }
   }
 
-  private async performFullScan(): Promise<void> {
+  private async performFullScan(skipUnchanged = false): Promise<void> {
     const allowed = this.allowedExtensions();
     const candidates = this.app.vault
       .getFiles()
       .filter((file) => !this.isDataPath(file.path) && allowed.has(file.extension.toLowerCase()));
+    // Older snapshots have no size and get read once to populate it. A matching
+    // mtime AND byte size avoids re-reading unchanged files on later startups.
+    const toRead = skipUnchanged
+      ? candidates.filter((file) => !isUnchangedSnapshot(this.fileIndex.getByPath(file.path), file.stat))
+      : candidates;
     const failedFiles: TFile[] = [];
-    for (let offset = 0; offset < candidates.length; offset += 12) {
-      const batch = candidates.slice(offset, offset + 12);
+    for (let offset = 0; offset < toRead.length; offset += 12) {
+      if (this.disposed) return;
+      const batch = toRead.slice(offset, offset + 12);
       const results = await Promise.all(
         batch.map(async (file) => ({
           file,
-          snapshot: await this.scanFile(file, false),
+          snapshot: await this.scanFile(file, false, false),
         })),
       );
       failedFiles.push(...results.filter(({ snapshot }) => !snapshot).map(({ file }) => file));
@@ -478,7 +514,7 @@ export class WritingCalendarRuntime {
     }
     const unresolvedFiles = await retryFailedItems(
       failedFiles,
-      async (file) => Boolean(await this.scanFile(file, false)),
+      async (file) => Boolean(await this.scanFile(file, false, false)),
       2,
     );
     for (const file of unresolvedFiles) {
@@ -489,7 +525,8 @@ export class WritingCalendarRuntime {
       candidates.map((file) => file.path),
     );
     for (const path of missing) this.fileIndex.remove(path);
-    await this.options.saveLocalState();
+    if (this.disposed) return;
+    if (toRead.length > 0 || missing.length > 0) await this.options.saveLocalState();
     this.scheduleNotify();
   }
 
@@ -535,7 +572,7 @@ export class WritingCalendarRuntime {
     this.scheduleNotify();
   }
 
-  private async scanFile(file: TFile, reportFailure = true): Promise<ReturnType<FileIndex["getByPath"]>> {
+  private async scanFile(file: TFile, reportFailure = true, save = true): Promise<ReturnType<FileIndex["getByPath"]>> {
     if (this.isDataPath(file.path) || !this.allowedExtensions().has(file.extension.toLowerCase())) return undefined;
     try {
       const text = await this.app.vault.cachedRead(file);
@@ -549,12 +586,13 @@ export class WritingCalendarRuntime {
         path: file.path,
         ctime: file.stat.ctime,
         mtime: file.stat.mtime,
+        size: file.stat.size,
         creative: countCreativeWords(vector),
         bodyCharacters: countBodyCharacters(vector),
         tags,
         properties,
       });
-      this.scheduleLocalSave();
+      if (save) this.scheduleLocalSave();
       return snapshot;
     } catch (error) {
       if (reportFailure) this.reportError("读取正文失败，已跳过该文件", error, file.path);
