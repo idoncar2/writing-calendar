@@ -18,4 +18,6 @@ export interface WritingCalendarViewHost {
   subscribeFocusRecords(listener: () => void): () => void;
   openSettings(): void;
   openDiagnostics(): Promise<void>;
+  /** Read-only, in-memory measurements for this plugin activation. */
+  getStartupPerformanceReport(): string;
 }

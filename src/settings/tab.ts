@@ -423,6 +423,19 @@ export class WritingCalendarSettingTab extends PluginSettingTab {
         text.setValue(this.host.settings.dataFolder).setDisabled(true);
       });
     new Setting(container)
+      .setName("启动性能诊断")
+      .setDesc("只统计本次启动各阶段耗时、文件及事件数量，不读取或上传笔记内容，不修改历史数据。")
+      .addButton((button) =>
+        button.setButtonText("复制启动耗时报告").onClick(async () => {
+          try {
+            await navigator.clipboard.writeText(this.host.getStartupPerformanceReport());
+            new Notice("启动耗时报告已复制，可以粘贴到对话框分析。");
+          } catch {
+            new Notice("复制失败，请改用命令面板或查看开发者控制台。");
+          }
+        }),
+      );
+    new Setting(container)
       .setName("数据诊断")
       .setDesc("查看账本读取、同步完整性、设备状态和当前文件索引。诊断不会修改历史账本。")
       .addButton((button) =>
