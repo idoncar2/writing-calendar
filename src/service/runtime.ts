@@ -155,7 +155,9 @@ export class WritingCalendarRuntime {
   private recordingSetup?: Promise<void>;
   private resolveHistoryDelay?: () => void;
   private reloadGeneration = 0;
-  /** Appends made after (or during) a historical read must never be overwritten by it. */
+  private historyLoadedOnce = false;
+  private activeHistoryReads = 0;
+  /** Only retains appends during history reads; never grows for an entire writing session. */
   private readonly localUnacknowledgedEvents = new Map<string, ActivityEvent>();
   private pendingFullScan = false;
   private pendingSyncedReload = false;
@@ -422,11 +424,19 @@ export class WritingCalendarRuntime {
   async reloadSyncedData(notify = true): Promise<void> {
     if (this.state.paused) return;
     const generation = ++this.reloadGeneration;
-    const [loadedEvents, loadedProjects, loadedDevices] = await Promise.all([
-      this.storage.loadEvents(),
-      this.storage.loadProjectVersions(),
-      this.storage.loadDeviceMetadata(),
-    ]);
+    this.activeHistoryReads++;
+    let loadedEvents: LoadedEvents;
+    let loadedProjects: Awaited<ReturnType<CalendarStorage["loadProjectVersions"]>>;
+    let loadedDevices: Awaited<ReturnType<CalendarStorage["loadDeviceMetadata"]>>;
+    try {
+      [loadedEvents, loadedProjects, loadedDevices] = await Promise.all([
+        this.storage.loadEvents(),
+        this.storage.loadProjectVersions(),
+        this.storage.loadDeviceMetadata(),
+      ]);
+    } finally {
+      this.activeHistoryReads--;
+    }
     if (this.disposed || generation !== this.reloadGeneration) return;
     const loadedIds = new Set(loadedEvents.events.map((event) => event.eventId));
     for (const id of loadedIds) this.localUnacknowledgedEvents.delete(id);
@@ -444,6 +454,8 @@ export class WritingCalendarRuntime {
     this.deviceMetadata = diagnosticDevices(loadedDevices.records);
     this.projectVersions = loadedProjects.records;
     this.engine.setEvents(this.events);
+    this.historyLoadedOnce = true;
+    if (this.activeHistoryReads === 0) this.localUnacknowledgedEvents.clear();
     this.applyProjectResolution();
     this.state.lastLedgerRead = new Date().toISOString();
     this.state.diagnostics = this.state.diagnostics.filter((item) => !item.path?.startsWith(this.settings.dataFolder));
@@ -505,7 +517,9 @@ export class WritingCalendarRuntime {
     });
     try {
       await this.storage.appendEvent(event);
-      this.localUnacknowledgedEvents.set(event.eventId, event);
+      if (!this.historyLoadedOnce || this.activeHistoryReads > 0) {
+        this.localUnacknowledgedEvents.set(event.eventId, event);
+      }
       this.events.push(event);
       this.ledgerReport = {
         ...this.ledgerReport,
