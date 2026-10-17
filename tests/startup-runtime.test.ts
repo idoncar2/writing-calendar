@@ -157,6 +157,24 @@ describe("nonblocking startup safety", () => {
     runtime.dispose();
   });
 
+  it("lets the recorder persist immediately without touching old ledgers", async () => {
+    const { runtime, file } = setup();
+    runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
+    const appendEvent = vi.fn(async (_event: unknown) => {});
+    runtime.storage.appendEvent = appendEvent;
+    runtime.storage.loadEvents = vi.fn(async () => { throw new Error("History is unavailable"); });
+    await runtime.recordActivity(file, {
+      source: "typing", insertedText: "开始", deletedText: "", userEvents: ["input.type"],
+      docChanged: true, countsAsManual: true, recordsActivity: true,
+      hasInsertion: true, hasDeletion: false,
+    });
+    await runtime.startRecording();
+    expect(runtime.getState()).toMatchObject({ recordingReady: true, paused: false, initializing: true });
+    expect(appendEvent).toHaveBeenCalledTimes(1);
+    expect(runtime.storage.loadEvents).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
   it("preserves a freshly written event when a stale historical read resolves", async () => {
     const { runtime, file } = setup();
     runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
