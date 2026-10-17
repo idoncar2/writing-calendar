@@ -77,6 +77,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   private unregisterModule?: () => void;
   private unsubscribeStatus?: () => void;
   private unsubscribeExplorer?: () => void;
+  private startupTimer?: number;
   private explorerCounts!: FileExplorerCounts;
 
   async onload(): Promise<void> {
@@ -160,7 +161,8 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       void this.openWorkbench();
     });
 
-    await this.runtime.initialize();
+    // Never make Obsidian's plugin startup wait for ledger hydration and vault scanning.
+    // Activity tracking is already registered; the runtime buffers early edits until ready.
     const loadedFocus = await this.focusStorage.loadSessions();
     this.focusRecords = this.mergeFocusRecords(loadedFocus.records);
     if (loadedFocus.warnings.length > 0) {
@@ -208,9 +210,18 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
         await this.saveLocalState();
       });
     });
+    // Give the workspace a chance to paint before reading history and scanning files.
+    this.startupTimer = window.setTimeout(() => {
+      this.startupTimer = undefined;
+      void this.runtime.initialize().catch((error) => {
+        console.error("写作日历：后台初始化失败", error);
+        new Notice("写作日历初始化失败，请检查控制台和数据目录。", 8000);
+      });
+    }, 350);
   }
 
   onunload(): void {
+    if (this.startupTimer !== undefined) window.clearTimeout(this.startupTimer);
     if (this.focusTickTimer !== undefined) window.clearInterval(this.focusTickTimer);
     if (this.focusCheckpointTimer !== undefined) window.clearInterval(this.focusCheckpointTimer);
     if (this.focusReloadTimer !== undefined) window.clearTimeout(this.focusReloadTimer);
