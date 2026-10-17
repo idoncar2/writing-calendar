@@ -3,6 +3,8 @@ export interface FileSnapshotInput {
   /** Observed creation time; atomic writes and sync may change it without changing identity. */
   ctime?: number;
   mtime: number;
+  /** Byte size used with mtime to avoid re-reading unchanged documents at startup. */
+  size?: number;
   creative: number;
   bodyCharacters: number;
   /** Obsidian tags observed during the latest local metadata scan. */

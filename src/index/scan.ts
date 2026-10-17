@@ -32,3 +32,18 @@ export async function retryFailedItems<T>(
 
   return pending;
 }
+
+/**
+ * Only a previously scanned document with both matching modified time and
+ * byte length can skip a startup read. Older index entries must be scanned
+ * once to populate size. Explicit user rescans never use this shortcut.
+ */
+export function isUnchangedSnapshot(
+  snapshot: { mtime: number; size?: number } | undefined,
+  file: { mtime: number; size: number },
+): boolean {
+  return snapshot !== undefined
+    && typeof snapshot.size === "number"
+    && snapshot.mtime === file.mtime
+    && snapshot.size === file.size;
+}

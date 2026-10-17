@@ -211,7 +211,13 @@ export class WritingCalendarView extends ItemView {
     this.renderMonthHeatmap(calendar, snapshot, today);
 
     const state = this.host.runtime.getState();
-    if (state.paused) {
+    if (state.initializing) {
+      container.createDiv({
+        cls: "wc-inline-status",
+        text: "正在加载历史统计，启动期间的输入会暂存并补记…",
+        attr: { role: "status" },
+      });
+    } else if (state.paused) {
       container.createDiv({
         cls: "wc-inline-status is-warning",
         text: "活动记录已暂停，请在设置中检查数据目录。",

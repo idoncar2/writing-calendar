@@ -16,7 +16,7 @@ import {
 import { LocalDiagnosticBaselineStore, type DiagnosticBaselineStore } from "../diagnostics/storage";
 import { FileIndex } from "../index/file-index";
 import { missingVaultPaths } from "../index/reconcile";
-import { retryFailedItems } from "../index/scan";
+import { isUnchangedSnapshot, retryFailedItems } from "../index/scan";
 import type { ActivityEvent } from "../ledger/types";
 import { resolveProjectVersions, createProjectVersion, type ProjectVersionConflict, type ProjectVersionRecord } from "../projects/versions";
 import type { ProjectDefinition, ProjectFilter } from "../projects/types";
@@ -43,6 +43,7 @@ export interface RuntimeDiagnostic {
 }
 
 export interface RuntimeState {
+  initializing: boolean;
   dataFolderStatus: DataFolderStatus;
   paused: boolean;
   lastLedgerRead: string;
@@ -145,8 +146,14 @@ export class WritingCalendarRuntime {
   private readonly activityTimezone = new ActivityTimezone();
   private scanAllFilesTask?: Promise<void>;
   private scanAgain = false;
+  private rescanRequiresFull = false;
+  private activityReady = false;
+  private pendingFullScan = false;
+  private pendingSyncedReload = false;
+  private readonly pendingActivities: Array<{ file: TFile; activity: TrackedEditorActivity; at: Date }> = [];
   private disposed = false;
   private state: RuntimeState = {
+    initializing: true,
     dataFolderStatus: "missing",
     paused: true,
     lastLedgerRead: "",
@@ -173,6 +180,7 @@ export class WritingCalendarRuntime {
   }
 
   async initialize(): Promise<void> {
+    try {
     const returningUser = this.settings.activationDate.length > 0;
     this.state.dataFolderStatus = await this.storage.ensureDataFolder(!returningUser);
     this.state.paused = this.state.dataFolderStatus === "missing";
@@ -182,18 +190,63 @@ export class WritingCalendarRuntime {
     } else {
       await this.writeDeviceMetadata();
       await this.reloadSyncedData(false);
+      // Sync may write additional ledgers while the initial read is in flight.
+      // Recheck once if a Vault event arrived in that interval.
+      if (this.pendingSyncedReload) {
+        this.pendingSyncedReload = false;
+        await this.reloadSyncedData(false);
+      }
     }
-    await this.scanAllFiles();
-    if (!this.settings.activationDate) this.settings.activationDate = localDateString();
-    await this.options.saveLocalState();
-    this.scheduleNotify();
+    // Historical events and project definitions are ready. Flush real edits
+    // captured while startup was deferred, before beginning the vault scan.
+    if (this.disposed) return;
+    // Keep queuing edits while the backlog is being written. This prevents a
+    // sync reload from racing with partially replayed startup activity.
+    if (!this.state.paused) {
+      while (this.pendingActivities.length > 0 && !this.disposed && !this.state.paused) {
+        const pending = this.pendingActivities.splice(0);
+        for (const item of pending) {
+          if (this.disposed || this.state.paused) break;
+          await this.recordReadyActivity(item.file, item.activity, item.at);
+        }
+      }
+    }
+    if (this.disposed) return;
+    this.pendingActivities.length = 0;
+    this.activityReady = true;
+    if (this.pendingSyncedReload) {
+      this.pendingSyncedReload = false;
+      this.scheduleSyncedDataReload();
+    }
+    const fullScanRequested = this.pendingFullScan;
+    this.pendingFullScan = false;
+    await this.scanAllFiles(!fullScanRequested);
+    if (this.disposed) return;
+    if (!this.settings.activationDate) {
+      this.settings.activationDate = localDateString();
+      await this.options.saveLocalState();
+    }
+    // A clean startup does not need to serialize/compress the whole historical
+    // file index. Changed files are persisted once by performFullScan.
+    } catch (error) {
+      // A failed startup must never look like healthy recording while early
+      // edits are still queued and cannot be durably appended.
+      this.state.paused = true;
+      this.addDiagnostic("error", "写作日历初始化失败，活动记录已暂停。");
+      throw error;
+    } finally {
+      this.state.initializing = false;
+      if (!this.disposed) this.scheduleNotify();
+    }
   }
 
   dispose(): void {
     this.disposed = true;
     this.idleTasks.dispose();
     this.activityListeners.clear();
-    void this.options.saveLocalState();
+    this.pendingActivities.length = 0;
+    // Avoid writing out an incomplete index if disabled during startup.
+    if (this.activityReady) void this.options.saveLocalState();
   }
 
   subscribe(listener: () => void): () => void {
@@ -325,6 +378,10 @@ export class WritingCalendarRuntime {
   }
 
   scheduleSyncedDataReload(): void {
+    if (!this.activityReady) {
+      this.pendingSyncedReload = true;
+      return;
+    }
     this.idleTasks.schedule("reload", () => {
       void this.reloadSyncedData().catch((error) => this.reportError("重新读取同步数据失败", error));
     }, 500);
@@ -338,22 +395,31 @@ export class WritingCalendarRuntime {
     return path === this.settings.dataFolder || path.startsWith(`${this.settings.dataFolder}/`);
   }
 
-  async recordActivity(file: TFile, activity: TrackedEditorActivity): Promise<void> {
-    if (this.state.paused || this.disposed || this.isDataPath(file.path)) return;
+  async recordActivity(file: TFile, activity: TrackedEditorActivity, at = new Date()): Promise<void> {
+    if (this.disposed || this.isDataPath(file.path)) return;
+    this.noteEditorActivity();
+    if (!this.activityReady) {
+      this.pendingActivities.push({ file, activity, at });
+      return;
+    }
+    if (this.state.paused) return;
+    await this.recordReadyActivity(file, activity, at);
+  }
+
+  private async recordReadyActivity(file: TFile, activity: TrackedEditorActivity, at: Date): Promise<void> {
+    if (this.disposed || this.state.paused) return;
     let snapshot = this.fileIndex.getByPath(file.path);
     if (!snapshot) snapshot = await this.scanFile(file);
     if (!snapshot) return;
-    this.noteEditorActivity();
-    const now = new Date();
     const event = buildActivityEvent({
       activity,
       eventId: newId("evt"),
       deviceId: this.settings.deviceId,
       fileId: snapshot.fileId,
       path: snapshot.path,
-      timestamp: now,
-      timezone: this.activityTimezone.get(now.getTime()),
-      localDate: localDateString(now),
+      timestamp: at,
+      timezone: this.activityTimezone.get(at.getTime()),
+      localDate: localDateString(at),
     });
     try {
       await this.storage.appendEvent(event);
@@ -382,6 +448,9 @@ export class WritingCalendarRuntime {
       this.scheduleSyncedDataReload();
       return;
     }
+    // Obsidian emits metadata-cache changes for many unchanged files while
+    // starting up. The initial incremental scan covers all real file changes.
+    if (!this.activityReady) return;
     this.idleTasks.schedule(`scan:${file.path}`, () => {
       void this.scanFile(file).then(() => this.scheduleNotify()).catch((error) => this.reportError("更新文件统计失败", error, file.path));
     }, 1_000);
@@ -439,16 +508,24 @@ export class WritingCalendarRuntime {
     this.scheduleNotify();
   }
 
-  async scanAllFiles(): Promise<void> {
+  async scanAllFiles(skipUnchanged = false): Promise<void> {
+    if (!this.activityReady) {
+      if (!skipUnchanged) this.pendingFullScan = true;
+      return;
+    }
     if (this.scanAllFilesTask) {
       this.scanAgain = true;
+      this.rescanRequiresFull ||= !skipUnchanged;
       return this.scanAllFilesTask;
     }
 
     const task = (async () => {
+      let incremental = skipUnchanged;
       do {
         this.scanAgain = false;
-        await this.performFullScan();
+        this.rescanRequiresFull = false;
+        await this.performFullScan(incremental);
+        incremental = !this.rescanRequiresFull;
       } while (this.scanAgain && !this.disposed);
     })();
     this.scanAllFilesTask = task;
@@ -459,18 +536,24 @@ export class WritingCalendarRuntime {
     }
   }
 
-  private async performFullScan(): Promise<void> {
+  private async performFullScan(skipUnchanged = false): Promise<void> {
     const allowed = this.allowedExtensions();
     const candidates = this.app.vault
       .getFiles()
       .filter((file) => !this.isDataPath(file.path) && allowed.has(file.extension.toLowerCase()));
+    // Older snapshots have no size and get read once to populate it. A matching
+    // mtime AND byte size avoids re-reading unchanged files on later startups.
+    const toRead = skipUnchanged
+      ? candidates.filter((file) => !isUnchangedSnapshot(this.fileIndex.getByPath(file.path), file.stat))
+      : candidates;
     const failedFiles: TFile[] = [];
-    for (let offset = 0; offset < candidates.length; offset += 12) {
-      const batch = candidates.slice(offset, offset + 12);
+    for (let offset = 0; offset < toRead.length; offset += 12) {
+      if (this.disposed) return;
+      const batch = toRead.slice(offset, offset + 12);
       const results = await Promise.all(
         batch.map(async (file) => ({
           file,
-          snapshot: await this.scanFile(file, false),
+          snapshot: await this.scanFile(file, false, false),
         })),
       );
       failedFiles.push(...results.filter(({ snapshot }) => !snapshot).map(({ file }) => file));
@@ -478,7 +561,7 @@ export class WritingCalendarRuntime {
     }
     const unresolvedFiles = await retryFailedItems(
       failedFiles,
-      async (file) => Boolean(await this.scanFile(file, false)),
+      async (file) => Boolean(await this.scanFile(file, false, false)),
       2,
     );
     for (const file of unresolvedFiles) {
@@ -489,7 +572,8 @@ export class WritingCalendarRuntime {
       candidates.map((file) => file.path),
     );
     for (const path of missing) this.fileIndex.remove(path);
-    await this.options.saveLocalState();
+    if (this.disposed) return;
+    if (toRead.length > 0 || missing.length > 0) await this.options.saveLocalState();
     this.scheduleNotify();
   }
 
@@ -535,7 +619,7 @@ export class WritingCalendarRuntime {
     this.scheduleNotify();
   }
 
-  private async scanFile(file: TFile, reportFailure = true): Promise<ReturnType<FileIndex["getByPath"]>> {
+  private async scanFile(file: TFile, reportFailure = true, save = true): Promise<ReturnType<FileIndex["getByPath"]>> {
     if (this.isDataPath(file.path) || !this.allowedExtensions().has(file.extension.toLowerCase())) return undefined;
     try {
       const text = await this.app.vault.cachedRead(file);
@@ -545,16 +629,32 @@ export class WritingCalendarRuntime {
         : undefined;
       const properties = serializableProperties(metadata?.frontmatter);
       const tags = metadata ? [...new Set((getAllTags(metadata) ?? []).filter((tag): tag is string => typeof tag === "string"))] : [];
+      const creative = countCreativeWords(vector);
+      const bodyCharacters = countBodyCharacters(vector);
+      const current = this.fileIndex.getByPath(file.path);
+      // A metadata-cache notification alone is not a reason to compress and
+      // rewrite a multi-megabyte index when nothing actually changed.
+      if (current
+        && current.ctime === file.stat.ctime
+        && current.mtime === file.stat.mtime
+        && current.size === file.stat.size
+        && current.creative === creative
+        && current.bodyCharacters === bodyCharacters
+        && JSON.stringify(current.tags) === JSON.stringify(tags)
+        && JSON.stringify(current.properties) === JSON.stringify(properties)) {
+        return current;
+      }
       const snapshot = this.fileIndex.upsert({
         path: file.path,
         ctime: file.stat.ctime,
         mtime: file.stat.mtime,
-        creative: countCreativeWords(vector),
-        bodyCharacters: countBodyCharacters(vector),
+        size: file.stat.size,
+        creative,
+        bodyCharacters,
         tags,
         properties,
       });
-      this.scheduleLocalSave();
+      if (save) this.scheduleLocalSave();
       return snapshot;
     } catch (error) {
       if (reportFailure) this.reportError("读取正文失败，已跳过该文件", error, file.path);
