@@ -94,6 +94,7 @@ describe("nonblocking startup safety", () => {
   it("re-reads only changed files during startup; an explicit rescan visits every file", async () => {
     vi.stubGlobal("window", globalThis);
     const { runtime, file, other, saves } = setup();
+    runtime.activityReady = true;
     runtime.scanFile = vi.fn(async () => ({ fileId: "a" }));
     await runtime.scanAllFiles(true);
     expect(runtime.scanFile).toHaveBeenCalledTimes(1);
