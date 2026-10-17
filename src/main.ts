@@ -97,7 +97,10 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     const endIndexRebuild = this.startupProfiler.begin("文件索引建立");
     this.fileIndex = FileIndex.from(restoredIndex, () => generatedId("file"));
     endIndexRebuild();
-    this.startupProfiler.count("索引当前文件数", this.fileIndex.listCurrent().length);
+    this.startupProfiler.count("索引记录数", restoredIndex && typeof restoredIndex === "object"
+      && "snapshots" in restoredIndex && Array.isArray(restoredIndex.snapshots)
+      ? restoredIndex.snapshots.length
+      : 0);
     this.indexCompressionBackedUp = persisted.fileIndex?.formatVersion === 2;
     this.focusCheckpointStore = new LocalFocusCheckpointStore(this.app.vault.getName());
     this.focusStorage = new FocusStorage(this.app.vault.adapter, this.settings.dataFolder);
