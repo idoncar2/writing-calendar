@@ -156,6 +156,48 @@ describe("nonblocking startup safety", () => {
     runtime.dispose();
   });
 
+  it("preserves a freshly written event when a stale historical read resolves", async () => {
+    const { runtime, file } = setup();
+    runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
+    runtime.writeDeviceMetadata = vi.fn(async () => {});
+    runtime.scanAllFiles = vi.fn(async () => {});
+    runtime.waitForHistoryIdle = vi.fn(async () => {});
+    const earlyAt = new Date("2026-10-17T09:00:00.000Z");
+    const oldEvent = {
+      eventId: "old", deviceId: "old-device", timestamp: "2026-10-16T09:00:00.000Z",
+      localDate: "2026-10-16", timezone: "UTC",
+      fileId: "existing", path: file.path, source: "typing", formatVersion: 1,
+      counts: { typed: 1, paste: 0, otherInserted: 0, deleted: 0 },
+      bodyCharacterCounts: { typed: 1, paste: 0, otherInserted: 0, deleted: 0 },
+    };
+    let finishRead!: (value: any) => void;
+    const loadedEvents = new Promise<any>((resolve) => { finishRead = resolve; });
+    runtime.storage.loadEvents = vi.fn(async () => loadedEvents);
+    runtime.storage.loadProjectVersions = vi.fn(async () => ({ records: [], warnings: [] }));
+    runtime.storage.loadDeviceMetadata = vi.fn(async () => ({ records: [], warnings: [], files: [] }));
+    runtime.storage.appendEvent = vi.fn(async () => {});
+    const initialization = runtime.initialize();
+    await runtime.startRecording();
+    expect(runtime.getState().recordingReady).toBe(true);
+    await runtime.recordActivity(file, {
+      source: "typing", insertedText: "你好", deletedText: "", userEvents: ["input.type"],
+      docChanged: true, countsAsManual: true, recordsActivity: true,
+      hasInsertion: true, hasDeletion: false,
+    }, earlyAt);
+    expect(runtime.getDashboard().today.manual).toBe(2);
+    finishRead({
+      events: [oldEvent], files: ["old.jsonl"], warnings: [],
+      rawEventCount: 1, duplicateEventIds: [],
+    });
+    await initialization;
+    expect(runtime.events.map((event: any) => event.eventId)).toContain("old");
+    expect(runtime.events.length).toBe(2);
+    expect(runtime.events.filter((event: any) => event.source === "typing" && event.deviceId === "device-test")).toHaveLength(1);
+    expect(runtime.getDashboard().today.manual).toBe(2);
+    expect(runtime.ledgerReport.eventCount).toBe(2);
+    runtime.dispose();
+  });
+
   it("re-reads only changed files during startup; an explicit rescan visits every file", async () => {
     vi.stubGlobal("window", globalThis);
     const { runtime, file, other, saves } = setup();
