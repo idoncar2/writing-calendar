@@ -83,7 +83,8 @@ describe("nonblocking startup safety", () => {
     vi.setSystemTime(new Date("2026-10-17T09:00:04.000Z"));
     await runtime.recordActivity(file, { kind: "paste" });
     const secondAt = new Date();
-    // The first edit is processed before historical reads complete.
+    // The writer drains both edits without waiting for historical ledger reads.
+    await runtime.startRecording();
     expect(runtime.recordReadyActivity).toHaveBeenCalledTimes(2);
     expect(runtime.getState().recordingReady).toBe(true);
     finishLedger();
