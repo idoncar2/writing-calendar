@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { retryFailedItems } from "../src/index/scan";
+import { isUnchangedSnapshot, retryFailedItems } from "../src/index/scan";
 
 describe("scan retry helper", () => {
   it("retries a transiently failed file during the same scan", async () => {
@@ -28,5 +28,19 @@ describe("scan retry helper", () => {
 
     expect(unresolved).toEqual(["正文/损坏.md"]);
     expect(scan).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("incremental startup scan", () => {
+  it("skips only files with both matching modification time and byte size", () => {
+    const stored = { mtime: 1000, size: 500 };
+    expect(isUnchangedSnapshot(stored, { mtime: 1000, size: 500 })).toBe(true);
+    expect(isUnchangedSnapshot(stored, { mtime: 1001, size: 500 })).toBe(false);
+    expect(isUnchangedSnapshot(stored, { mtime: 1000, size: 501 })).toBe(false);
+  });
+
+  it("rescans legacy entries that do not yet have a stored byte size", () => {
+    expect(isUnchangedSnapshot({ mtime: 1000 }, { mtime: 1000, size: 500 })).toBe(false);
+    expect(isUnchangedSnapshot(undefined, { mtime: 1000, size: 500 })).toBe(false);
   });
 });
