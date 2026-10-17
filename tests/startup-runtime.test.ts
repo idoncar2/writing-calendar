@@ -128,13 +128,19 @@ describe("nonblocking startup safety", () => {
     runtime.writeDeviceMetadata = vi.fn(async () => {});
     runtime.reloadSyncedData = vi.fn(async () => {});
     runtime.scanAllFiles = vi.fn(async () => {});
+    const earlyAt = new Date("2026-10-17T08:30:15.000Z");
+    expect(runtime.getState().initializing).toBe(true);
     await runtime.recordActivity(file, {
       source: "typing", insertedText: "你好", deletedText: "", userEvents: ["input.type"],
       docChanged: true, countsAsManual: true, recordsActivity: true,
       hasInsertion: true, hasDeletion: false,
-    });
+    }, earlyAt);
     await runtime.initialize();
+    expect(runtime.getState()).toMatchObject({ initializing: false, paused: false });
     expect(appendEvent).toHaveBeenCalledTimes(1);
+    expect(appendEvent.mock.calls[0][0]).toMatchObject({
+      timestamp: earlyAt.toISOString(),
+    });
     expect(appendEvent.mock.calls[0][0]).toMatchObject({
       fileId: "existing",
       path: file.path,
