@@ -228,6 +228,12 @@ export class WritingCalendarRuntime {
     }
     // A clean startup does not need to serialize/compress the whole historical
     // file index. Changed files are persisted once by performFullScan.
+    } catch (error) {
+      // A failed startup must never look like healthy recording while early
+      // edits are still queued and cannot be durably appended.
+      this.state.paused = true;
+      this.addDiagnostic("error", "写作日历初始化失败，活动记录已暂停。");
+      throw error;
     } finally {
       this.state.initializing = false;
       if (!this.disposed) this.scheduleNotify();
