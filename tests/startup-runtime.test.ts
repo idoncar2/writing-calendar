@@ -74,7 +74,6 @@ describe("nonblocking startup safety", () => {
     runtime.reloadSyncedData = vi.fn(async () => ledgerLoading);
     runtime.scanAllFiles = vi.fn(async () => {});
     runtime.recordReadyActivity = vi.fn(async () => {});
-    runtime.waitForHistoryIdle = vi.fn(async () => {});
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-17T09:00:00.000Z"));
     await runtime.recordActivity(file, { kind: "typing" });
@@ -83,10 +82,7 @@ describe("nonblocking startup safety", () => {
     vi.setSystemTime(new Date("2026-10-17T09:00:04.000Z"));
     await runtime.recordActivity(file, { kind: "paste" });
     const secondAt = new Date();
-    // The writer drains both edits without waiting for historical ledger reads.
-    await runtime.startRecording();
-    expect(runtime.recordReadyActivity).toHaveBeenCalledTimes(2);
-    expect(runtime.getState().recordingReady).toBe(true);
+    expect(runtime.recordReadyActivity).not.toHaveBeenCalled();
     finishLedger();
     await task;
     expect(runtime.recordReadyActivity).toHaveBeenCalledTimes(2);
@@ -106,7 +102,6 @@ describe("nonblocking startup safety", () => {
     const firstWrite = new Promise<void>((resolve) => { resumeFirst = resolve; });
     let startedFirst!: () => void;
     const firstStarted = new Promise<void>((resolve) => { startedFirst = resolve; });
-    runtime.waitForHistoryIdle = vi.fn(async () => {});
     runtime.recordReadyActivity = vi.fn(async () => {
       if (runtime.recordReadyActivity.mock.calls.length === 1) {
         startedFirst();
@@ -133,7 +128,6 @@ describe("nonblocking startup safety", () => {
     runtime.writeDeviceMetadata = vi.fn(async () => {});
     runtime.reloadSyncedData = vi.fn(async () => {});
     runtime.scanAllFiles = vi.fn(async () => {});
-    runtime.waitForHistoryIdle = vi.fn(async () => {});
     const earlyAt = new Date("2026-10-17T08:30:15.000Z");
     expect(runtime.getState().initializing).toBe(true);
     await runtime.recordActivity(file, {
@@ -154,66 +148,6 @@ describe("nonblocking startup safety", () => {
       counts: { typed: 2, paste: 0, otherInserted: 0, deleted: 0 },
     });
     expect(runtime.getDashboard().today.manual).toBe(2);
-    runtime.dispose();
-  });
-
-  it("lets the recorder persist immediately without touching old ledgers", async () => {
-    const { runtime, file } = setup();
-    runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
-    const appendEvent = vi.fn(async (_event: unknown) => {});
-    runtime.storage.appendEvent = appendEvent;
-    runtime.storage.loadEvents = vi.fn(async () => { throw new Error("History is unavailable"); });
-    await runtime.recordActivity(file, {
-      source: "typing", insertedText: "开始", deletedText: "", userEvents: ["input.type"],
-      docChanged: true, countsAsManual: true, recordsActivity: true,
-      hasInsertion: true, hasDeletion: false,
-    });
-    await runtime.startRecording();
-    expect(runtime.getState()).toMatchObject({ recordingReady: true, paused: false, initializing: true });
-    expect(appendEvent).toHaveBeenCalledTimes(1);
-    expect(runtime.storage.loadEvents).not.toHaveBeenCalled();
-    runtime.dispose();
-  });
-
-  it("preserves a freshly written event when a stale historical read resolves", async () => {
-    const { runtime, file } = setup();
-    runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
-    runtime.writeDeviceMetadata = vi.fn(async () => {});
-    runtime.scanAllFiles = vi.fn(async () => {});
-    runtime.waitForHistoryIdle = vi.fn(async () => {});
-    const earlyAt = new Date("2026-10-17T09:00:00.000Z");
-    const oldEvent = {
-      eventId: "old", deviceId: "old-device", timestamp: "2026-10-16T09:00:00.000Z",
-      localDate: "2026-10-16", timezone: "UTC",
-      fileId: "existing", path: file.path, source: "typing", formatVersion: 1,
-      counts: { typed: 1, paste: 0, otherInserted: 0, deleted: 0 },
-      bodyCharacterCounts: { typed: 1, paste: 0, otherInserted: 0, deleted: 0 },
-    };
-    let finishRead!: (value: any) => void;
-    const loadedEvents = new Promise<any>((resolve) => { finishRead = resolve; });
-    runtime.storage.loadEvents = vi.fn(async () => loadedEvents);
-    runtime.storage.loadProjectVersions = vi.fn(async () => ({ records: [], warnings: [] }));
-    runtime.storage.loadDeviceMetadata = vi.fn(async () => ({ records: [], warnings: [], files: [] }));
-    runtime.storage.appendEvent = vi.fn(async () => {});
-    const initialization = runtime.initialize();
-    await runtime.startRecording();
-    expect(runtime.getState().recordingReady).toBe(true);
-    await runtime.recordActivity(file, {
-      source: "typing", insertedText: "你好", deletedText: "", userEvents: ["input.type"],
-      docChanged: true, countsAsManual: true, recordsActivity: true,
-      hasInsertion: true, hasDeletion: false,
-    }, earlyAt);
-    expect(runtime.getDashboard().today.manual).toBe(2);
-    finishRead({
-      events: [oldEvent], files: ["old.jsonl"], warnings: [],
-      rawEventCount: 1, duplicateEventIds: [],
-    });
-    await initialization;
-    expect(runtime.events.map((event: any) => event.eventId)).toContain("old");
-    expect(runtime.events.length).toBe(2);
-    expect(runtime.events.filter((event: any) => event.source === "typing" && event.deviceId === "device-test")).toHaveLength(1);
-    expect(runtime.getDashboard().today.manual).toBe(2);
-    expect(runtime.ledgerReport.eventCount).toBe(2);
     runtime.dispose();
   });
 
