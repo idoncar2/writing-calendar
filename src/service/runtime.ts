@@ -197,19 +197,24 @@ export class WritingCalendarRuntime {
     // Historical events and project definitions are ready. Flush real edits
     // captured while startup was deferred, before beginning the vault scan.
     if (this.disposed) return;
+    // Keep queuing edits while the backlog is being written. This prevents a
+    // sync reload from racing with partially replayed startup activity.
+    if (!this.state.paused) {
+      while (this.pendingActivities.length > 0 && !this.disposed && !this.state.paused) {
+        const pending = this.pendingActivities.splice(0);
+        for (const item of pending) {
+          if (this.disposed || this.state.paused) break;
+          await this.recordReadyActivity(item.file, item.activity, item.at);
+        }
+      }
+    }
+    if (this.disposed) return;
+    this.pendingActivities.length = 0;
     this.activityReady = true;
     if (this.pendingSyncedReload) {
       this.pendingSyncedReload = false;
       this.scheduleSyncedDataReload();
     }
-    const pending = this.pendingActivities.splice(0);
-    if (!this.state.paused) {
-      for (const item of pending) {
-        if (this.disposed || this.state.paused) break;
-        await this.recordReadyActivity(item.file, item.activity, item.at);
-      }
-    }
-    if (this.disposed) return;
     const fullScanRequested = this.pendingFullScan;
     this.pendingFullScan = false;
     await this.scanAllFiles(!fullScanRequested);
