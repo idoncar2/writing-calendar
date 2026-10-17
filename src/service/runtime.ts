@@ -43,6 +43,7 @@ export interface RuntimeDiagnostic {
 }
 
 export interface RuntimeState {
+  initializing: boolean;
   dataFolderStatus: DataFolderStatus;
   paused: boolean;
   lastLedgerRead: string;
@@ -152,6 +153,7 @@ export class WritingCalendarRuntime {
   private readonly pendingActivities: Array<{ file: TFile; activity: TrackedEditorActivity; at: Date }> = [];
   private disposed = false;
   private state: RuntimeState = {
+    initializing: true,
     dataFolderStatus: "missing",
     paused: true,
     lastLedgerRead: "",
@@ -178,6 +180,7 @@ export class WritingCalendarRuntime {
   }
 
   async initialize(): Promise<void> {
+    try {
     const returningUser = this.settings.activationDate.length > 0;
     this.state.dataFolderStatus = await this.storage.ensureDataFolder(!returningUser);
     this.state.paused = this.state.dataFolderStatus === "missing";
@@ -225,7 +228,10 @@ export class WritingCalendarRuntime {
     }
     // A clean startup does not need to serialize/compress the whole historical
     // file index. Changed files are persisted once by performFullScan.
-    this.scheduleNotify();
+    } finally {
+      this.state.initializing = false;
+      if (!this.disposed) this.scheduleNotify();
+    }
   }
 
   dispose(): void {
@@ -383,9 +389,8 @@ export class WritingCalendarRuntime {
     return path === this.settings.dataFolder || path.startsWith(`${this.settings.dataFolder}/`);
   }
 
-  async recordActivity(file: TFile, activity: TrackedEditorActivity): Promise<void> {
+  async recordActivity(file: TFile, activity: TrackedEditorActivity, at = new Date()): Promise<void> {
     if (this.disposed || this.isDataPath(file.path)) return;
-    const at = new Date();
     this.noteEditorActivity();
     if (!this.activityReady) {
       this.pendingActivities.push({ file, activity, at });
