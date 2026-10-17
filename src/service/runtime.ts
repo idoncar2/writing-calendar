@@ -613,13 +613,28 @@ export class WritingCalendarRuntime {
         : undefined;
       const properties = serializableProperties(metadata?.frontmatter);
       const tags = metadata ? [...new Set((getAllTags(metadata) ?? []).filter((tag): tag is string => typeof tag === "string"))] : [];
+      const creative = countCreativeWords(vector);
+      const bodyCharacters = countBodyCharacters(vector);
+      const current = this.fileIndex.getByPath(file.path);
+      // A metadata-cache notification alone is not a reason to compress and
+      // rewrite a multi-megabyte index when nothing actually changed.
+      if (current
+        && current.ctime === file.stat.ctime
+        && current.mtime === file.stat.mtime
+        && current.size === file.stat.size
+        && current.creative === creative
+        && current.bodyCharacters === bodyCharacters
+        && JSON.stringify(current.tags) === JSON.stringify(tags)
+        && JSON.stringify(current.properties) === JSON.stringify(properties)) {
+        return current;
+      }
       const snapshot = this.fileIndex.upsert({
         path: file.path,
         ctime: file.stat.ctime,
         mtime: file.stat.mtime,
         size: file.stat.size,
-        creative: countCreativeWords(vector),
-        bodyCharacters: countBodyCharacters(vector),
+        creative,
+        bodyCharacters,
         tags,
         properties,
       });
