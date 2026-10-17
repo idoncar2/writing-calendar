@@ -206,8 +206,12 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       // 布局里没有日历视图：可能是首次启用，也可能是上次启动失败/同步异常导致视图丢失。
       // 无论 sidebarIntroduced 处于什么状态都恢复日历，避免侧栏日历永久消失。
       void this.openCalendar().then(async () => {
-        this.settings.sidebarIntroduced = true;
-        await this.saveLocalState();
+        // Opening an already introduced sidebar is not a settings change.
+        // Avoid recompressing the entire historical index on every launch.
+        if (!this.settings.sidebarIntroduced) {
+          this.settings.sidebarIntroduced = true;
+          await this.saveLocalState();
+        }
       });
     });
     // Give the workspace a chance to paint before reading history and scanning files.
