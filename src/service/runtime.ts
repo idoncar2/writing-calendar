@@ -214,8 +214,12 @@ export class WritingCalendarRuntime {
     this.pendingFullScan = false;
     await this.scanAllFiles(!fullScanRequested);
     if (this.disposed) return;
-    if (!this.settings.activationDate) this.settings.activationDate = localDateString();
-    await this.options.saveLocalState();
+    if (!this.settings.activationDate) {
+      this.settings.activationDate = localDateString();
+      await this.options.saveLocalState();
+    }
+    // A clean startup does not need to serialize/compress the whole historical
+    // file index. Changed files are persisted once by performFullScan.
     this.scheduleNotify();
   }
 
