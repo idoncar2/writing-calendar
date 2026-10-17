@@ -26,6 +26,19 @@ export interface ClassifiedEditorActivity {
   hasDeletion: boolean;
 }
 
+/**
+ * Explicit editor-originated keystrokes and IME commits remain user input
+ * during the brief focus transition when an Obsidian note is first opened.
+ * Unfocused programmatic/completion changes still need a focused editor.
+ */
+export function shouldCaptureEditorActivity(activity: ClassifiedEditorActivity, hasFocus: boolean): boolean {
+  if (!activity.recordsActivity) return false;
+  return hasFocus || activity.source === "typing" || activity.source === "ime"
+    || activity.source === "paste" || activity.source === "cut"
+    || activity.source === "delete" || activity.source === "drop"
+    || activity.source === "undo" || activity.source === "redo";
+}
+
 function hasEvent(events: readonly string[], prefix: string): boolean {
   return events.some((event) => event === prefix || event.startsWith(`${prefix}.`));
 }
