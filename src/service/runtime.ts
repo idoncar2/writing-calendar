@@ -18,7 +18,6 @@ import { FileIndex } from "../index/file-index";
 import { missingVaultPaths } from "../index/reconcile";
 import { isUnchangedSnapshot, retryFailedItems } from "../index/scan";
 import type { ActivityEvent } from "../ledger/types";
-import { mergeEvents } from "../ledger/merge";
 import { resolveProjectVersions, createProjectVersion, type ProjectVersionConflict, type ProjectVersionRecord } from "../projects/versions";
 import type { ProjectDefinition, ProjectFilter } from "../projects/types";
 import { isWorkspaceScopeId, WORKSPACE_SCOPE_NAME } from "../projects/workspace";
@@ -45,7 +44,6 @@ export interface RuntimeDiagnostic {
 
 export interface RuntimeState {
   initializing: boolean;
-  recordingReady: boolean;
   dataFolderStatus: DataFolderStatus;
   paused: boolean;
   lastLedgerRead: string;
@@ -145,27 +143,17 @@ export class WritingCalendarRuntime {
   private readonly listeners = new Set<() => void>();
   private readonly activityListeners = new Set<(event: ActivityEvent) => void>();
   private readonly idleTasks: EditorIdleTasks;
-  private readonly historyIdleTasks: EditorIdleTasks;
   private readonly activityTimezone = new ActivityTimezone();
   private scanAllFilesTask?: Promise<void>;
   private scanAgain = false;
   private rescanRequiresFull = false;
   private activityReady = false;
-  private historyReady = false;
-  private recordingSetup?: Promise<void>;
-  private resolveHistoryDelay?: () => void;
-  private reloadGeneration = 0;
-  private historyLoadedOnce = false;
-  private activeHistoryReads = 0;
-  /** Only retains appends during history reads; never grows for an entire writing session. */
-  private readonly localUnacknowledgedEvents = new Map<string, ActivityEvent>();
   private pendingFullScan = false;
   private pendingSyncedReload = false;
   private readonly pendingActivities: Array<{ file: TFile; activity: TrackedEditorActivity; at: Date }> = [];
   private disposed = false;
   private state: RuntimeState = {
     initializing: true,
-    recordingReady: false,
     dataFolderStatus: "missing",
     paused: true,
     lastLedgerRead: "",
@@ -179,7 +167,6 @@ export class WritingCalendarRuntime {
 
   constructor(private readonly options: WritingCalendarRuntimeOptions) {
     this.idleTasks = new EditorIdleTasks(options.isMobile ? 750 : 0);
-    this.historyIdleTasks = new EditorIdleTasks(options.isMobile ? 1800 : 1200);
     this.app = options.app;
     this.settings = options.settings;
     this.fileIndex = options.fileIndex;
@@ -192,108 +179,70 @@ export class WritingCalendarRuntime {
     });
   }
 
-  /**
-   * Starts the durable writer independently of ledger history, statistics,
-   * device metadata and the vault-wide scan. Idempotent across startup callers.
-   */
-  startRecording(): Promise<void> {
-    this.recordingSetup ??= this.prepareRecording();
-    return this.recordingSetup;
-  }
-
-  private async prepareRecording(): Promise<void> {
-    const returningUser = this.settings.activationDate.length > 0;
-    this.state.dataFolderStatus = await this.storage.ensureDataFolder(!returningUser);
-    if (this.disposed) return;
-    this.state.paused = this.state.dataFolderStatus === "missing";
-    if (this.state.paused) {
-      this.addDiagnostic("warning", "未发现写作日历数据目录。请先完成同步，或在设置中确认新建目录。");
-      new Notice("写作日历：等待同步数据目录，活动记录已暂停。", 8000);
-      this.scheduleNotify();
-      return;
-    }
-
-    // Drain without dropping the item until its append succeeded. New edits
-    // continue to queue until all pre-start records are durable.
-    while (this.pendingActivities.length > 0 && !this.disposed && !this.state.paused) {
-      const item = this.pendingActivities[0];
-      await this.recordReadyActivity(item.file, item.activity, item.at);
-      if (!this.state.paused) this.pendingActivities.shift();
-    }
-    if (this.disposed || this.state.paused) return;
-    this.activityReady = true;
-    this.state.recordingReady = true;
-    this.scheduleNotify();
-  }
-
-  private waitForHistoryIdle(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const done = () => {
-        this.resolveHistoryDelay = undefined;
-        resolve();
-      };
-      this.resolveHistoryDelay = done;
-      // Defer CPU-intensive ledger decoding until the first quiet window.
-      // Writing remains active even when a long session keeps postponing it.
-      this.historyIdleTasks.schedule("hydrate-history", done, 1200);
-    });
-  }
-
   async initialize(): Promise<void> {
     try {
-      await this.startRecording();
-      if (this.disposed) return;
-      // The writer is now live; historical reads must not hold its readiness.
-      await this.waitForHistoryIdle();
-      if (this.disposed) return;
-      if (!this.state.paused) {
-        await this.writeDeviceMetadata();
-        // Edits and local metadata written before this point are included in
-        // the initial read. Only sync changes during that read need a retry.
+    const returningUser = this.settings.activationDate.length > 0;
+    this.state.dataFolderStatus = await this.storage.ensureDataFolder(!returningUser);
+    this.state.paused = this.state.dataFolderStatus === "missing";
+    if (this.state.paused) {
+      this.addDiagnostic("warning", "未发现写作日历数据目录。请先完成 Remotely Save 同步，或在设置中确认新建目录。");
+      new Notice("写作日历：等待同步数据目录，活动记录已暂停。", 8000);
+    } else {
+      await this.writeDeviceMetadata();
+      await this.reloadSyncedData(false);
+      // Sync may write additional ledgers while the initial read is in flight.
+      // Recheck once if a Vault event arrived in that interval.
+      if (this.pendingSyncedReload) {
         this.pendingSyncedReload = false;
         await this.reloadSyncedData(false);
-        // A synchronization notification during hydration needs a second read.
-        if (this.pendingSyncedReload) {
-          this.pendingSyncedReload = false;
-          await this.reloadSyncedData(false);
+      }
+    }
+    // Historical events and project definitions are ready. Flush real edits
+    // captured while startup was deferred, before beginning the vault scan.
+    if (this.disposed) return;
+    // Keep queuing edits while the backlog is being written. This prevents a
+    // sync reload from racing with partially replayed startup activity.
+    if (!this.state.paused) {
+      while (this.pendingActivities.length > 0 && !this.disposed && !this.state.paused) {
+        const pending = this.pendingActivities.splice(0);
+        for (const item of pending) {
+          if (this.disposed || this.state.paused) break;
+          await this.recordReadyActivity(item.file, item.activity, item.at);
         }
       }
-      if (this.disposed) return;
-      this.historyReady = true;
-      const fullScanRequested = this.pendingFullScan;
-      this.pendingFullScan = false;
-      await this.scanAllFiles(!fullScanRequested);
-      if (this.disposed) return;
-      if (!this.settings.activationDate) {
-        this.settings.activationDate = localDateString();
-        await this.options.saveLocalState();
-      }
+    }
+    if (this.disposed) return;
+    this.pendingActivities.length = 0;
+    this.activityReady = true;
+    if (this.pendingSyncedReload) {
+      this.pendingSyncedReload = false;
+      this.scheduleSyncedDataReload();
+    }
+    const fullScanRequested = this.pendingFullScan;
+    this.pendingFullScan = false;
+    await this.scanAllFiles(!fullScanRequested);
+    if (this.disposed) return;
+    if (!this.settings.activationDate) {
+      this.settings.activationDate = localDateString();
+      await this.options.saveLocalState();
+    }
+    // A clean startup does not need to serialize/compress the whole historical
+    // file index. Changed files are persisted once by performFullScan.
     } catch (error) {
-      if (!this.state.recordingReady) {
-        this.state.paused = true;
-        this.addDiagnostic("error", "写作日历记录器初始化失败。");
-      } else {
-        // A history refresh failure must not disable a functioning recorder.
-        this.addDiagnostic("error", "历史统计加载失败，写作记录仍在运行。");
-      }
+      // A failed startup must never look like healthy recording while early
+      // edits are still queued and cannot be durably appended.
+      this.state.paused = true;
+      this.addDiagnostic("error", "写作日历初始化失败，活动记录已暂停。");
       throw error;
     } finally {
       this.state.initializing = false;
-      if (!this.disposed) {
-        if (this.historyReady && this.pendingSyncedReload) {
-          this.pendingSyncedReload = false;
-          this.scheduleSyncedDataReload();
-        }
-        this.scheduleNotify();
-      }
+      if (!this.disposed) this.scheduleNotify();
     }
   }
 
   dispose(): void {
     this.disposed = true;
     this.idleTasks.dispose();
-    this.historyIdleTasks.dispose();
-    this.resolveHistoryDelay?.();
     this.activityListeners.clear();
     this.pendingActivities.length = 0;
     // Avoid writing out an incomplete index if disabled during startup.
@@ -403,59 +352,22 @@ export class WritingCalendarRuntime {
   async createMissingDataFolder(): Promise<void> {
     this.state.dataFolderStatus = await this.storage.ensureDataFolder(true);
     this.state.paused = false;
-    await this.prepareMissingFolderRecovery();
     await this.writeDeviceMetadata();
     await this.reloadSyncedData();
   }
 
-  private async prepareMissingFolderRecovery(): Promise<void> {
-    while (this.pendingActivities.length > 0 && !this.disposed && !this.state.paused) {
-      const item = this.pendingActivities[0];
-      await this.recordReadyActivity(item.file, item.activity, item.at);
-      if (!this.state.paused) this.pendingActivities.shift();
-    }
-    if (!this.disposed && !this.state.paused) {
-      this.activityReady = true;
-      this.state.recordingReady = true;
-      this.scheduleNotify();
-    }
-  }
-
   async reloadSyncedData(notify = true): Promise<void> {
     if (this.state.paused) return;
-    const generation = ++this.reloadGeneration;
-    this.activeHistoryReads++;
-    let loadedEvents: LoadedEvents;
-    let loadedProjects: Awaited<ReturnType<CalendarStorage["loadProjectVersions"]>>;
-    let loadedDevices: Awaited<ReturnType<CalendarStorage["loadDeviceMetadata"]>>;
-    try {
-      [loadedEvents, loadedProjects, loadedDevices] = await Promise.all([
-        this.storage.loadEvents(),
-        this.storage.loadProjectVersions(),
-        this.storage.loadDeviceMetadata(),
-      ]);
-    } finally {
-      this.activeHistoryReads--;
-    }
-    if (this.disposed || generation !== this.reloadGeneration) return;
-    const loadedIds = new Set(loadedEvents.events.map((event) => event.eventId));
-    for (const id of loadedIds) this.localUnacknowledgedEvents.delete(id);
-    // New writes that happened while loadEvents was reading earlier ledger
-    // files must remain visible; merge by eventId, never reset to stale history.
-    this.events = this.localUnacknowledgedEvents.size
-      ? mergeEvents([...loadedEvents.events, ...this.localUnacknowledgedEvents.values()])
-      : loadedEvents.events;
-    this.ledgerReport = {
-      ...diagnosticLedgerReport(loadedEvents),
-      eventCount: this.events.length,
-      rawEventCount: loadedEvents.rawEventCount + this.localUnacknowledgedEvents.size,
-      deviceEvents: compactDiagnosticDeviceEvents(this.events),
-    };
+    const [loadedEvents, loadedProjects, loadedDevices] = await Promise.all([
+      this.storage.loadEvents(),
+      this.storage.loadProjectVersions(),
+      this.storage.loadDeviceMetadata(),
+    ]);
+    this.events = loadedEvents.events;
+    this.ledgerReport = diagnosticLedgerReport(loadedEvents);
     this.deviceMetadata = diagnosticDevices(loadedDevices.records);
     this.projectVersions = loadedProjects.records;
     this.engine.setEvents(this.events);
-    this.historyLoadedOnce = true;
-    if (this.activeHistoryReads === 0) this.localUnacknowledgedEvents.clear();
     this.applyProjectResolution();
     this.state.lastLedgerRead = new Date().toISOString();
     this.state.diagnostics = this.state.diagnostics.filter((item) => !item.path?.startsWith(this.settings.dataFolder));
@@ -466,7 +378,7 @@ export class WritingCalendarRuntime {
   }
 
   scheduleSyncedDataReload(): void {
-    if (!this.historyReady || this.state.initializing) {
+    if (!this.activityReady) {
       this.pendingSyncedReload = true;
       return;
     }
@@ -477,7 +389,6 @@ export class WritingCalendarRuntime {
 
   noteEditorActivity(): void {
     this.idleTasks.noteActivity();
-    this.historyIdleTasks.noteActivity();
   }
 
   isDataPath(path: string): boolean {
@@ -499,12 +410,7 @@ export class WritingCalendarRuntime {
     if (this.disposed || this.state.paused) return;
     let snapshot = this.fileIndex.getByPath(file.path);
     if (!snapshot) snapshot = await this.scanFile(file);
-    if (!snapshot) {
-      this.state.paused = true;
-      this.addDiagnostic("error", "无法识别正在编辑的文件，记录已暂停以避免漏记。", file.path);
-      this.scheduleNotify();
-      return;
-    }
+    if (!snapshot) return;
     const event = buildActivityEvent({
       activity,
       eventId: newId("evt"),
@@ -517,9 +423,6 @@ export class WritingCalendarRuntime {
     });
     try {
       await this.storage.appendEvent(event);
-      if (!this.historyLoadedOnce || this.activeHistoryReads > 0) {
-        this.localUnacknowledgedEvents.set(event.eventId, event);
-      }
       this.events.push(event);
       this.ledgerReport = {
         ...this.ledgerReport,
