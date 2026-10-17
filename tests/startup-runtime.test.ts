@@ -92,6 +92,34 @@ describe("nonblocking startup safety", () => {
     vi.useRealTimers();
   });
 
+  it("drains edits arriving during replay before marking history ready", async () => {
+    const { runtime, file } = setup();
+    runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
+    runtime.writeDeviceMetadata = vi.fn(async () => {});
+    runtime.reloadSyncedData = vi.fn(async () => {});
+    runtime.scanAllFiles = vi.fn(async () => {});
+    let resumeFirst!: () => void;
+    const firstWrite = new Promise<void>((resolve) => { resumeFirst = resolve; });
+    let startedFirst!: () => void;
+    const firstStarted = new Promise<void>((resolve) => { startedFirst = resolve; });
+    runtime.recordReadyActivity = vi.fn(async () => {
+      if (runtime.recordReadyActivity.mock.calls.length === 1) {
+        startedFirst();
+        await firstWrite;
+      }
+    });
+    await runtime.recordActivity(file, { source: "typing" });
+    const startup = runtime.initialize();
+    await firstStarted;
+    await runtime.recordActivity(file, { source: "paste" });
+    expect(runtime.activityReady).toBe(false);
+    resumeFirst();
+    await startup;
+    expect(runtime.recordReadyActivity).toHaveBeenCalledTimes(2);
+    expect(runtime.activityReady).toBe(true);
+    runtime.dispose();
+  });
+
   it("actually writes an early edit into the existing file's ledger identity", async () => {
     const { runtime, file } = setup();
     runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
