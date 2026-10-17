@@ -31,6 +31,7 @@ import {
   type StorageWarning,
 } from "../storage/calendar-storage";
 import type { TrackedEditorActivity } from "../tracking/codemirror";
+import type { StartupProfiler } from "../diagnostics/startup-profiler";
 import { buildActivityEvent } from "./activity-event";
 import { ActivityTimezone } from "./activity-timezone";
 import { EditorIdleTasks } from "./editor-idle-tasks";
@@ -57,6 +58,7 @@ export interface WritingCalendarRuntimeOptions {
   saveLocalState: () => Promise<void>;
   diagnosticBaselineStore?: DiagnosticBaselineStore;
   isMobile?: boolean;
+  startupProfiler?: StartupProfiler;
 }
 
 function newId(prefix: string): string {
@@ -173,20 +175,40 @@ export class WritingCalendarRuntime {
   }
 
   async initialize(): Promise<void> {
+    const finishInitialize = this.options.startupProfiler?.begin("运行时初始化");
+    try {
     const returningUser = this.settings.activationDate.length > 0;
-    this.state.dataFolderStatus = await this.storage.ensureDataFolder(!returningUser);
+    const finishDirectory = this.options.startupProfiler?.begin("检查写作数据目录");
+    try {
+      this.state.dataFolderStatus = await this.storage.ensureDataFolder(!returningUser);
+    } finally {
+      finishDirectory?.();
+    }
     this.state.paused = this.state.dataFolderStatus === "missing";
     if (this.state.paused) {
       this.addDiagnostic("warning", "未发现写作日历数据目录。请先完成 Remotely Save 同步，或在设置中确认新建目录。");
       new Notice("写作日历：等待同步数据目录，活动记录已暂停。", 8000);
     } else {
-      await this.writeDeviceMetadata();
+      const finishMetadata = this.options.startupProfiler?.begin("写入设备元数据");
+      try {
+        await this.writeDeviceMetadata();
+      } finally {
+        finishMetadata?.();
+      }
       await this.reloadSyncedData(false);
     }
     await this.scanAllFiles();
     if (!this.settings.activationDate) this.settings.activationDate = localDateString();
-    await this.options.saveLocalState();
+    const finishSave = this.options.startupProfiler?.begin("初始化本地数据保存");
+    try {
+      await this.options.saveLocalState();
+    } finally {
+      finishSave?.();
+    }
     this.scheduleNotify();
+    } finally {
+      finishInitialize?.();
+    }
   }
 
   dispose(): void {
@@ -305,11 +327,28 @@ export class WritingCalendarRuntime {
 
   async reloadSyncedData(notify = true): Promise<void> {
     if (this.state.paused) return;
-    const [loadedEvents, loadedProjects, loadedDevices] = await Promise.all([
-      this.storage.loadEvents(),
-      this.storage.loadProjectVersions(),
-      this.storage.loadDeviceMetadata(),
-    ]);
+    const profile = this.options.startupProfiler;
+    const time = async <T>(name: string, run: () => Promise<T>): Promise<T> => {
+      const finish = profile?.begin(name);
+      try { return await run(); } finally { finish?.(); }
+    };
+    const finishReload = profile?.begin("读取并合并历史数据");
+    let loadedEvents: LoadedEvents;
+    let loadedProjects: Awaited<ReturnType<CalendarStorage["loadProjectVersions"]>>;
+    let loadedDevices: Awaited<ReturnType<CalendarStorage["loadDeviceMetadata"]>>;
+    try {
+      [loadedEvents, loadedProjects, loadedDevices] = await Promise.all([
+        time("读取历史写作账本", () => this.storage.loadEvents()),
+        time("读取项目版本", () => this.storage.loadProjectVersions()),
+        time("读取设备信息", () => this.storage.loadDeviceMetadata()),
+      ]);
+      profile?.count("历史账本文件数", loadedEvents.files.length);
+      profile?.count("历史写作事件数", loadedEvents.events.length);
+      profile?.count("读取原始事件数", loadedEvents.rawEventCount);
+    } finally {
+      finishReload?.();
+    }
+    const finishMerge = profile?.begin("历史数据写入统计引擎");
     this.events = loadedEvents.events;
     this.ledgerReport = diagnosticLedgerReport(loadedEvents);
     this.deviceMetadata = diagnosticDevices(loadedDevices.records);
@@ -322,6 +361,7 @@ export class WritingCalendarRuntime {
     for (const warning of loadedProjects.warnings) this.addStorageWarning(warning);
     for (const warning of loadedDevices.warnings) this.addStorageWarning(warning);
     if (notify) this.scheduleNotify();
+    finishMerge?.();
   }
 
   scheduleSyncedDataReload(): void {
@@ -339,7 +379,11 @@ export class WritingCalendarRuntime {
   }
 
   async recordActivity(file: TFile, activity: TrackedEditorActivity): Promise<void> {
-    if (this.state.paused || this.disposed || this.isDataPath(file.path)) return;
+    this.options.startupProfiler?.mark("首次写作活动进入记录器");
+    if (this.state.paused || this.disposed || this.isDataPath(file.path)) {
+      this.options.startupProfiler?.mark("首次记录被暂停或过滤");
+      return;
+    }
     let snapshot = this.fileIndex.getByPath(file.path);
     if (!snapshot) snapshot = await this.scanFile(file);
     if (!snapshot) return;
@@ -355,8 +399,10 @@ export class WritingCalendarRuntime {
       timezone: this.activityTimezone.get(now.getTime()),
       localDate: localDateString(now),
     });
+    const finishAppend = this.options.startupProfiler?.begin("写作事件追加到账本");
     try {
       await this.storage.appendEvent(event);
+      this.options.startupProfiler?.mark("首次写作事件成功保存");
       this.events.push(event);
       this.ledgerReport = {
         ...this.ledgerReport,
@@ -374,6 +420,8 @@ export class WritingCalendarRuntime {
       this.reportError("写入活动账本失败，统计记录已暂停", error);
       this.state.paused = true;
       new Notice("写作日历：活动账本写入失败，已暂停记录。", 8000);
+    } finally {
+      finishAppend?.();
     }
   }
 
@@ -460,10 +508,13 @@ export class WritingCalendarRuntime {
   }
 
   private async performFullScan(): Promise<void> {
+    const finishScan = this.options.startupProfiler?.begin("全库扫描");
+    try {
     const allowed = this.allowedExtensions();
     const candidates = this.app.vault
       .getFiles()
       .filter((file) => !this.isDataPath(file.path) && allowed.has(file.extension.toLowerCase()));
+    this.options.startupProfiler?.count("扫描候选文件数", candidates.length);
     const failedFiles: TFile[] = [];
     for (let offset = 0; offset < candidates.length; offset += 12) {
       const batch = candidates.slice(offset, offset + 12);
@@ -488,9 +539,14 @@ export class WritingCalendarRuntime {
       this.fileIndex.listCurrent().map((snapshot) => snapshot.path),
       candidates.map((file) => file.path),
     );
+    this.options.startupProfiler?.count("扫描失败文件数", unresolvedFiles.length);
+    this.options.startupProfiler?.count("索引中失踪文件数", missing.length);
     for (const path of missing) this.fileIndex.remove(path);
     await this.options.saveLocalState();
     this.scheduleNotify();
+    } finally {
+      finishScan?.();
+    }
   }
 
   async saveProject(definition: ProjectDefinition): Promise<void> {
