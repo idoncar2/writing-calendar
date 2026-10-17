@@ -138,6 +138,12 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     for (const { file, activity, at } of this.earlyEditorActivities.splice(0)) {
       void this.runtime.recordActivity(file, activity, at);
     }
+    // Prepare durable ledger writes now, before slow focus-session recovery,
+    // dashboard construction, or historical ledger decoding.
+    void this.runtime.startRecording().catch((error) => {
+      console.error("写作日历：写作记录器启动失败", error);
+      new Notice("写作日历记录器启动失败，请检查数据目录。", 8000);
+    });
 
     this.registerView(WRITING_CALENDAR_VIEW_TYPE, (leaf) => new WritingCalendarView(leaf, this));
     this.registerView(
