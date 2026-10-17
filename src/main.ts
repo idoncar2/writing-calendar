@@ -89,12 +89,17 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
     this.registerEditorExtension(
       createActivityTrackingExtension((activity, editorView) => {
         if (!shouldCaptureEditorActivity(activity, editorView.hasFocus)) return;
-        const owner = this.app.workspace.getLeavesOfType("markdown")
-          .map((leaf) => leaf.view)
-          .find((view): view is MarkdownView =>
-            view instanceof MarkdownView && !!view.file && view.contentEl.contains(editorView.dom),
-          );
-        const markdownView = owner ?? this.app.workspace.getActiveViewOfType(MarkdownView);
+        // The common active-editor path takes one containment check. Search
+        // the other leaves only when focus/layout is still transitioning.
+        const active = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const owner = active?.file && active.contentEl.contains(editorView.dom)
+          ? active
+          : this.app.workspace.getLeavesOfType("markdown")
+            .map((leaf) => leaf.view)
+            .find((view): view is MarkdownView =>
+              view instanceof MarkdownView && !!view.file && view.contentEl.contains(editorView.dom),
+            );
+        const markdownView = owner ?? active;
         if (!markdownView?.file) return;
         const at = new Date();
         if (this.runtime) {
