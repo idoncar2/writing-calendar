@@ -14,18 +14,25 @@ export class StartupProfiler {
   private readonly milestones = new Map<string, number>();
   private readonly counters = new Map<string, number>();
   private readonly maxSpans = 80;
+  private readonly samplesPerStage = new Map<string, number>();
 
   constructor(private readonly clock: () => number = () => performance.now()) {
     this.startedAt = clock();
   }
 
   begin(name: string): () => void {
+    // Only the first few writes/scans belong to startup diagnostics. Never
+    // keep sampling every keystroke during a long writing session.
+    if ((this.samplesPerStage.get(name) ?? 0) >= 3 || this.spans.length >= this.maxSpans) {
+      return () => undefined;
+    }
     const start = this.clock();
     let completed = false;
     return () => {
       if (completed) return;
       completed = true;
       if (this.spans.length >= this.maxSpans) return;
+      this.samplesPerStage.set(name, (this.samplesPerStage.get(name) ?? 0) + 1);
       this.spans.push({
         name,
         startedMs: Math.max(0, start - this.startedAt),
@@ -41,7 +48,9 @@ export class StartupProfiler {
   }
 
   count(name: string, count: number): void {
-    if (Number.isFinite(count) && count >= 0) this.counters.set(name, Math.round(count));
+    if (!this.counters.has(name) && Number.isFinite(count) && count >= 0) {
+      this.counters.set(name, Math.round(count));
+    }
   }
 
   snapshot(): { spans: StartupSpan[]; milestones: Array<{ name: string; atMs: number }>; counters: Array<{ name: string; value: number }> } {
