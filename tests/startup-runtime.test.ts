@@ -91,6 +91,31 @@ describe("nonblocking startup safety", () => {
     vi.useRealTimers();
   });
 
+  it("actually writes an early edit into the existing file's ledger identity", async () => {
+    const { runtime, file } = setup();
+    runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
+    const appendEvent = vi.fn(async () => {});
+    runtime.storage.appendEvent = appendEvent;
+    runtime.writeDeviceMetadata = vi.fn(async () => {});
+    runtime.reloadSyncedData = vi.fn(async () => {});
+    runtime.scanAllFiles = vi.fn(async () => {});
+    await runtime.recordActivity(file, {
+      source: "typing", insertedText: "你好", deletedText: "", userEvents: ["input.type"],
+      docChanged: true, countsAsManual: true, recordsActivity: true,
+      hasInsertion: true, hasDeletion: false,
+    });
+    await runtime.initialize();
+    expect(appendEvent).toHaveBeenCalledTimes(1);
+    expect(appendEvent.mock.calls[0][0]).toMatchObject({
+      fileId: "existing",
+      path: file.path,
+      source: "typing",
+      counts: { typed: 2, paste: 0, otherInserted: 0, deleted: 0 },
+    });
+    expect(runtime.getDashboard().today.manual).toBe(2);
+    runtime.dispose();
+  });
+
   it("re-reads only changed files during startup; an explicit rescan visits every file", async () => {
     vi.stubGlobal("window", globalThis);
     const { runtime, file, other, saves } = setup();
