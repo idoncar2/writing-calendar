@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyEditorActivity } from "../src/tracking/classifier";
+import { classifyEditorActivity, shouldCaptureEditorActivity } from "../src/tracking/classifier";
 
 describe("classifyEditorActivity", () => {
   it("treats normal typing and committed IME input as manual input", () => {
@@ -83,5 +83,31 @@ describe("classifyEditorActivity", () => {
         userEvents: ["input.type"],
       }),
     ).toMatchObject({ source: "typing", countsAsManual: true, hasInsertion: true, hasDeletion: true });
+  });
+});
+
+describe("startup focus transition", () => {
+  it("keeps first keystrokes and IME commits when focus state is momentarily stale", () => {
+    for (const userEvent of ["input.type", "input.type.compose", "input.paste"]) {
+      const activity = classifyEditorActivity({
+        docChanged: true, insertedText: "你好", deletedText: "", userEvents: [userEvent],
+      });
+      expect(shouldCaptureEditorActivity(activity, false)).toBe(true);
+    }
+  });
+
+  it("does not count unfocused programmatic edits as keystrokes", () => {
+    const activity = classifyEditorActivity({
+      docChanged: true, insertedText: "后台修改", deletedText: "", userEvents: [],
+    });
+    expect(shouldCaptureEditorActivity(activity, false)).toBe(false);
+    expect(shouldCaptureEditorActivity(activity, true)).toBe(true);
+  });
+
+  it("ignores changes without activity", () => {
+    const activity = classifyEditorActivity({
+      docChanged: false, insertedText: "", deletedText: "", userEvents: [],
+    });
+    expect(shouldCaptureEditorActivity(activity, true)).toBe(false);
   });
 });
