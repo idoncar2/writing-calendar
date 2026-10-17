@@ -74,6 +74,7 @@ describe("nonblocking startup safety", () => {
     runtime.reloadSyncedData = vi.fn(async () => ledgerLoading);
     runtime.scanAllFiles = vi.fn(async () => {});
     runtime.recordReadyActivity = vi.fn(async () => {});
+    runtime.waitForHistoryIdle = vi.fn(async () => {});
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-17T09:00:00.000Z"));
     await runtime.recordActivity(file, { kind: "typing" });
@@ -82,7 +83,9 @@ describe("nonblocking startup safety", () => {
     vi.setSystemTime(new Date("2026-10-17T09:00:04.000Z"));
     await runtime.recordActivity(file, { kind: "paste" });
     const secondAt = new Date();
-    expect(runtime.recordReadyActivity).not.toHaveBeenCalled();
+    // The first edit is processed before historical reads complete.
+    expect(runtime.recordReadyActivity).toHaveBeenCalledTimes(2);
+    expect(runtime.getState().recordingReady).toBe(true);
     finishLedger();
     await task;
     expect(runtime.recordReadyActivity).toHaveBeenCalledTimes(2);
@@ -102,6 +105,7 @@ describe("nonblocking startup safety", () => {
     const firstWrite = new Promise<void>((resolve) => { resumeFirst = resolve; });
     let startedFirst!: () => void;
     const firstStarted = new Promise<void>((resolve) => { startedFirst = resolve; });
+    runtime.waitForHistoryIdle = vi.fn(async () => {});
     runtime.recordReadyActivity = vi.fn(async () => {
       if (runtime.recordReadyActivity.mock.calls.length === 1) {
         startedFirst();
@@ -128,6 +132,7 @@ describe("nonblocking startup safety", () => {
     runtime.writeDeviceMetadata = vi.fn(async () => {});
     runtime.reloadSyncedData = vi.fn(async () => {});
     runtime.scanAllFiles = vi.fn(async () => {});
+    runtime.waitForHistoryIdle = vi.fn(async () => {});
     const earlyAt = new Date("2026-10-17T08:30:15.000Z");
     expect(runtime.getState().initializing).toBe(true);
     await runtime.recordActivity(file, {
