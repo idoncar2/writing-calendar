@@ -58,6 +58,7 @@ function setup() {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -72,8 +73,8 @@ describe("nonblocking startup safety", () => {
     runtime.reloadSyncedData = vi.fn(async () => ledgerLoading);
     runtime.scanAllFiles = vi.fn(async () => {});
     runtime.recordReadyActivity = vi.fn(async () => {});
-    vi.setSystemTime(new Date("2026-10-17T09:00:00.000Z"));
     vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-17T09:00:00.000Z"));
     await runtime.recordActivity(file, { kind: "typing" });
     const firstAt = new Date();
     const task = runtime.initialize();
