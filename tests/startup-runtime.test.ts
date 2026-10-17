@@ -95,7 +95,7 @@ describe("nonblocking startup safety", () => {
   it("actually writes an early edit into the existing file's ledger identity", async () => {
     const { runtime, file } = setup();
     runtime.storage.ensureDataFolder = vi.fn(async () => "ready");
-    const appendEvent = vi.fn(async () => {});
+    const appendEvent = vi.fn(async (_event: unknown) => {});
     runtime.storage.appendEvent = appendEvent;
     runtime.writeDeviceMetadata = vi.fn(async () => {});
     runtime.reloadSyncedData = vi.fn(async () => {});
