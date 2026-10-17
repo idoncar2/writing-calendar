@@ -147,6 +147,8 @@ export class WritingCalendarRuntime {
   private scanAgain = false;
   private rescanRequiresFull = false;
   private activityReady = false;
+  private pendingFullScan = false;
+  private pendingSyncedReload = false;
   private readonly pendingActivities: Array<{ file: TFile; activity: TrackedEditorActivity; at: Date }> = [];
   private disposed = false;
   private state: RuntimeState = {
@@ -185,10 +187,21 @@ export class WritingCalendarRuntime {
     } else {
       await this.writeDeviceMetadata();
       await this.reloadSyncedData(false);
+      // Sync may write additional ledgers while the initial read is in flight.
+      // Recheck once if a Vault event arrived in that interval.
+      if (this.pendingSyncedReload) {
+        this.pendingSyncedReload = false;
+        await this.reloadSyncedData(false);
+      }
     }
     // Historical events and project definitions are ready. Flush real edits
     // captured while startup was deferred, before beginning the vault scan.
+    if (this.disposed) return;
     this.activityReady = true;
+    if (this.pendingSyncedReload) {
+      this.pendingSyncedReload = false;
+      this.scheduleSyncedDataReload();
+    }
     const pending = this.pendingActivities.splice(0);
     if (!this.state.paused) {
       for (const item of pending) {
@@ -197,7 +210,10 @@ export class WritingCalendarRuntime {
       }
     }
     if (this.disposed) return;
-    await this.scanAllFiles(true);
+    const fullScanRequested = this.pendingFullScan;
+    this.pendingFullScan = false;
+    await this.scanAllFiles(!fullScanRequested);
+    if (this.disposed) return;
     if (!this.settings.activationDate) this.settings.activationDate = localDateString();
     await this.options.saveLocalState();
     this.scheduleNotify();
@@ -341,6 +357,10 @@ export class WritingCalendarRuntime {
   }
 
   scheduleSyncedDataReload(): void {
+    if (!this.activityReady) {
+      this.pendingSyncedReload = true;
+      return;
+    }
     this.idleTasks.schedule("reload", () => {
       void this.reloadSyncedData().catch((error) => this.reportError("重新读取同步数据失败", error));
     }, 500);
@@ -408,6 +428,9 @@ export class WritingCalendarRuntime {
       this.scheduleSyncedDataReload();
       return;
     }
+    // Obsidian emits metadata-cache changes for many unchanged files while
+    // starting up. The initial incremental scan covers all real file changes.
+    if (!this.activityReady) return;
     this.idleTasks.schedule(`scan:${file.path}`, () => {
       void this.scanFile(file).then(() => this.scheduleNotify()).catch((error) => this.reportError("更新文件统计失败", error, file.path));
     }, 1_000);
@@ -466,6 +489,10 @@ export class WritingCalendarRuntime {
   }
 
   async scanAllFiles(skipUnchanged = false): Promise<void> {
+    if (!this.activityReady) {
+      if (!skipUnchanged) this.pendingFullScan = true;
+      return;
+    }
     if (this.scanAllFilesTask) {
       this.scanAgain = true;
       this.rescanRequiresFull ||= !skipUnchanged;
