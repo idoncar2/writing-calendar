@@ -20,7 +20,8 @@ import {
 import { WritingCalendarRuntime } from "./service/runtime";
 import { normalizeSettings, type WritingCalendarSettings } from "./settings/model";
 import { WritingCalendarSettingTab } from "./settings/tab";
-import { createActivityTrackingExtension } from "./tracking/codemirror";
+import { createActivityTrackingExtension, type TrackedEditorActivity } from "./tracking/codemirror";
+import { shouldCaptureEditorActivity } from "./tracking/classifier";
 import {
   WRITING_CALENDAR_VIEW_TYPE,
   WritingCalendarView,
@@ -78,9 +79,31 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   private unsubscribeStatus?: () => void;
   private unsubscribeExplorer?: () => void;
   private startupTimer?: number;
+  private readonly earlyEditorActivities: Array<{ file: TFile; activity: TrackedEditorActivity; at: Date }> = [];
   private explorerCounts!: FileExplorerCounts;
 
   async onload(): Promise<void> {
+    // Install capture BEFORE awaiting the potentially large settings/index read.
+    // The runtime buffers its own pre-hydration edits; this smaller queue covers
+    // the still-earlier window before the runtime object exists at all.
+    this.registerEditorExtension(
+      createActivityTrackingExtension((activity, editorView) => {
+        if (!shouldCaptureEditorActivity(activity, editorView.hasFocus)) return;
+        const owner = this.app.workspace.getLeavesOfType("markdown")
+          .map((leaf) => leaf.view)
+          .find((view): view is MarkdownView =>
+            view instanceof MarkdownView && !!view.file && view.contentEl.contains(editorView.dom),
+          );
+        const markdownView = owner ?? this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!markdownView?.file) return;
+        const at = new Date();
+        if (this.runtime) {
+          void this.runtime.recordActivity(markdownView.file, activity, at);
+        } else {
+          this.earlyEditorActivities.push({ file: markdownView.file, activity, at });
+        }
+      }, () => this.runtime?.noteEditorActivity()),
+    );
     const persisted = ((await this.loadData()) ?? {}) as PersistedPluginData & Record<string, unknown>;
     this.settings = normalizeSettings(persisted.settings ?? persisted);
     setUiLanguage(this.settings.uiLanguage);
@@ -107,6 +130,9 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       fileIndex: this.fileIndex,
       saveLocalState: () => this.saveLocalState(),
     });
+    for (const { file, activity, at } of this.earlyEditorActivities.splice(0)) {
+      void this.runtime.recordActivity(file, activity, at);
+    }
 
     this.registerView(WRITING_CALENDAR_VIEW_TYPE, (leaf) => new WritingCalendarView(leaf, this));
     this.registerView(
@@ -140,14 +166,6 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
       callback: () => void this.runtime.scanAllFiles(),
     });
 
-    this.registerEditorExtension(
-      createActivityTrackingExtension((activity, editorView) => {
-        if (!editorView.hasFocus) return;
-        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!markdownView?.file) return;
-        void this.runtime.recordActivity(markdownView.file, activity);
-      }, () => this.runtime?.noteEditorActivity()),
-    );
     this.registerVaultEvents();
     this.statusBar = this.addStatusBarItem();
     this.statusBar.addClass("wc-status-bar");
@@ -225,6 +243,7 @@ export default class WritingCalendarPlugin extends Plugin implements WritingCale
   }
 
   onunload(): void {
+    this.earlyEditorActivities.length = 0;
     if (this.startupTimer !== undefined) window.clearTimeout(this.startupTimer);
     if (this.focusTickTimer !== undefined) window.clearInterval(this.focusTickTimer);
     if (this.focusCheckpointTimer !== undefined) window.clearInterval(this.focusCheckpointTimer);
